@@ -43,6 +43,7 @@ public:
 		cab2L.reset (); cab2R.reset ();
 		cabHpL.reset (); cabHpR.reset ();
 		sagEnv = 1.f;
+		sagLevel = 0.f;
 		dcL = dcR = 0.f;
 	}
 
@@ -83,10 +84,15 @@ public:
 
 		const float g = dbToGain (driveGainDb ());
 
-		// sag: the supply droops under sustained drive and recovers.  This is
-		// what makes a held chord breathe instead of sitting still.
-		const float target = 1.f / (1.f + 0.55f * drive_ * std::fabs (l + r) * 0.5f);
-		sagEnv += (target - sagEnv) * 0.00035f;
+		// Sag: the supply droops under sustained drive and recovers.  The
+		// detector must be a *rectified, smoothed* envelope, not |sample|:
+		// following the waveform means a low note modulates the gain at its own
+		// frequency, which both distorts and pumps the amp whenever a bass note
+		// is held.
+		const float level = 0.5f * (std::fabs (l) + std::fabs (r));
+		sagLevel += (level - sagLevel) * 0.0006f;
+		const float target = 1.f / (1.f + 0.45f * drive_ * sagLevel);
+		sagEnv += (target - sagEnv) * 0.00010f;
 
 		l *= g * (0.72f + 0.28f * sagEnv);
 		r *= g * (0.72f + 0.28f * sagEnv);
@@ -156,7 +162,7 @@ public:
 		l *= kOutTrim[char_];
 		r *= kOutTrim[char_];
 
-		flushDenorm (dcL); flushDenorm (dcR); flushDenorm (sagEnv);
+		flushDenorm (dcL); flushDenorm (dcR); flushDenorm (sagEnv); flushDenorm (sagLevel);
 	}
 
 	static constexpr float kOutTrim[4] = { 0.26f, 0.24f, 0.26f, 0.30f };
@@ -229,6 +235,7 @@ private:
 	float bassDb_ = 0.f, midDb_ = 0.f, trebleDb_ = 0.f;
 	float presence_ = 0.4f, cab_ = 0.7f;
 	float sagEnv = 1.f;
+	float sagLevel = 0.f;
 	float dcL = 0.f, dcR = 0.f;
 
 	Biquad hpL, hpR, preL, preR;

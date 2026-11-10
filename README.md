@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.3
+# HanaGuitar for indie 1.4
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -322,6 +322,7 @@ build\host_test.exe    63 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.4 | **HanaGuitar for indie** | 低音不再“吃掉”后面的音：共鸣器组高通 + 降增益、sag 改用整流包络 |
 | 1.3 | **HanaGuitar for indie** | 更长延音/更慢弹簧、攻击性、空腔共振、tapping/legato 重做、Bar 参数 + LFO、面板尺寸/黑屏修复 |
 
 插件身份：class `HanaGuitar for indie`，UID `0FF5E701-4A2C7B13-B8D94062-5C1E3F88`，

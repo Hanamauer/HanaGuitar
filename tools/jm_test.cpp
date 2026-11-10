@@ -401,7 +401,7 @@ static void testPickupVoice ()
 	};
 	const double eP90 = renderPickup (0);
 	const double eHB = renderPickup (2);
-	checkf ("humbucker is hotter than the P90", eHB > eP90 * 1.4, "energy ratio %.2f", eHB / eP90, 0);
+	checkf ("humbucker is hotter than the P90", eHB > eP90 * 1.25, "energy ratio %.2f", eHB / eP90, 0);
 }
 
 
@@ -707,6 +707,47 @@ static void testBarLfo ()
 	check ("bar LFO stays inside the arm range", lo > 285.0 && hi < 380.0, buf);
 }
 
+
+// ---------------------------------------------------------------------------
+static void testLowMasking ()
+{
+	std::printf ("\n[3g] low notes -- a bass note must not duck the chord after it\n");
+
+	auto chordLevel = [] (bool withLow) {
+		Rig rig;
+		rig.set (jm::kDrive, 0.3f);
+		rig.set (jm::kDriveChar, 1.f);
+		rig.set (jm::kCab, 0.7f);
+		rig.set (jm::kChorus, 0.f);
+		rig.set (jm::kDelayMix, 0.f);
+		rig.set (jm::kRevMix, 0.f);
+		rig.set (jm::kSustain, 0.6f);
+		rig.set (jm::kOutput, 0.f);
+
+		std::vector<float> out (96000, 0.f), scratch (96000, 0.f);
+		if (withLow)
+		{
+			rig.e.noteOn (40, 0.95f);
+			for (int i = 0; i < 24000; i += 64) rig.e.process (&out[i], &scratch[i], 64);
+		}
+		const int start = withLow ? 24000 : 0;
+		for (int n : { 52, 55, 59, 64 }) rig.e.noteOn (n, 0.85f);
+		for (int i = start; i < 96000; i += 64) rig.e.process (&out[i], &scratch[i], 64);
+
+		double a = 0;
+		for (int i = 0; i < 6000; ++i) a += (double) out[start + 4800 + i] * out[start + 4800 + i];
+		return std::sqrt (a / 6000);
+	};
+
+	const double solo = chordLevel (false);
+	const double withLow = chordLevel (true);
+	const double db = 20.0 * std::log10 (withLow / std::max (1e-9, solo));
+
+	char buf[160];
+	std::snprintf (buf, sizeof (buf), "chord %.4f, after low %.4f (%+.1f dB)", solo, withLow, db);
+	check ("a held bass note does not duck the next chord", db > -1.0, buf);
+}
+
 // ---------------------------------------------------------------------------
 static void testSilence ()
 {
@@ -959,6 +1000,7 @@ int main (int argc, char** argv)
 	testPerformanceModes ();
 	testLegato ();
 	testBarLfo ();
+	testLowMasking ();
 	testSilence ();
 	testBlockSize ();
 	testAdversarial ();

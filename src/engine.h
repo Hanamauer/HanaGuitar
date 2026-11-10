@@ -92,21 +92,26 @@ public:
 		for (int i = 0; i < 6; ++i)
 		{
 			const float f = 440.f * std::pow (2.f, (float) (kTunings[tuning][i] - 69) / 12.f);
-			r[i].set (f, 1.4f, fs);
+			r[i].set (f, 0.9f, fs);
 			r[i].reset ();
 		}
 	}
-	void reset () { for (int i = 0; i < 6; ++i) r[i].reset (); }
+	void reset () { for (int i = 0; i < 6; ++i) r[i].reset (); hpZ = 0.f; }
 
 	inline float process (float x)
 	{
+		// High-pass the drive: a low E2 must not pump the E2 resonator, or the
+		// whole low end blooms and masks everything played after it.
+		const float hp = x - hpZ;
+		hpZ += 0.02f * hp;
 		float s = 0.f;
-		for (int i = 0; i < 6; ++i) s += r[i].process (x);
+		for (int i = 0; i < 6; ++i) s += r[i].process (hp);
 		return s;
 	}
 
 private:
 	Resonator r[6];
+	float hpZ = 0.f;
 	float fs = 48000.f;
 	int tuned = -1;
 };
@@ -517,7 +522,7 @@ public:
 			float r = l;
 
 			if (sympathy > 0.001f && l != 0.f)
-				l += symBank.process (l) * sympathy * 6.0f;
+				l += symBank.process (l) * sympathy * 2.2f;
 
 			// ---- body, amp, space ---------------------------------------
 			{
