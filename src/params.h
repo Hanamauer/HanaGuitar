@@ -53,11 +53,15 @@ enum P : ParamID
 	// --- column 6: MASTER
 	kTremRate,
 	kTremDepth,
-	kBarLfoRate,
-	kBarLfoDepth,
 	kTuning,
 	kRevMode,
 	kOutput,
+	// --- whammy envelope (drawn as an ADSR panel, not knobs)
+	kBarAtk,
+	kBarDec,
+	kBarSus,
+	kBarRel,
+	kBarDepth,
 	// --- preset selector
 	kPreset,
 	// --- the bar itself, exposed for host automation (no panel knob: it is
@@ -130,11 +134,14 @@ static const ParamDef kParamDefs[] = {
 	// MASTER
 	{ kTremRate,     "Trem Rate",   "MASTER",  "Hz", 0.2f, 12.f, 3.50f, 0, nullptr, 0 },
 	{ kTremDepth,    "Trem Depth",  "MASTER",  "",   0.f, 1.f,  0.00f, 0, nullptr, 0 },
-	{ kBarLfoRate,   "Bar Rate",    "MASTER",  "Hz", 0.03f, 8.f, 0.25f, 0, nullptr, 0 },
-	{ kBarLfoDepth,  "Bar Depth",   "MASTER",  "",   0.f, 1.f,  0.00f, 0, nullptr, 0 },
 	{ kTuning,       "Tuning",      "MASTER",  "",   0.f, 6.f,  0.f,   6, kTuningItems, 7 },
 	{ kRevMode,      "Reverb Mode", "MASTER",  "",   0.f, 4.f,  1.f,   4, kRevItems, 5 },
 	{ kOutput,       "Output",      "MASTER",  "dB", -30.f, 12.f, -4.f, 0, nullptr, 0 },
+	{ kBarAtk,       "Bar Attack",  "WHAMMY",  "s",  0.005f, 3.f, 0.25f, 0, nullptr, 0 },
+	{ kBarDec,       "Bar Decay",   "WHAMMY",  "s",  0.005f, 3.f, 0.40f, 0, nullptr, 0 },
+	{ kBarSus,       "Bar Sustain", "WHAMMY",  "",   0.f, 1.f,  0.45f, 0, nullptr, 0 },
+	{ kBarRel,       "Bar Release", "WHAMMY",  "s",  0.005f, 4.f, 0.70f, 0, nullptr, 0 },
+	{ kBarDepth,     "Bar Depth",   "WHAMMY",  "",   0.f, 1.f,  0.00f, 0, nullptr, 0 },
 	// preset
 	{ kPreset,       "Preset",      "",        "",   0.f, 3.f,  3.f,   3, kPresetItems, 4 },
 	{ kBar,          "Bar",         "WHAMMY",  "",   0.f, 1.f,  0.f,   0, nullptr, 0 },

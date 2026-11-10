@@ -665,46 +665,42 @@ static void testLegato ()
 }
 
 
-// ---------------------------------------------------------------------------
-static void testBarLfo ()
-{
-	std::printf ("\n[3f] bar LFO -- the arm can wobble on its own\n");
 
-	auto render = [] (float depth) {
+// ---------------------------------------------------------------------------
+static void testBarEnvelope ()
+{
+	std::printf ("\n[3f] bar envelope -- attack, sustain and release move the arm\n");
+
+	auto run = [] (float depth, bool gateOff) {
 		Rig rig;
 		rig.set (jm::kDrive, 0.f);
 		rig.set (jm::kCab, 0.f);
 		rig.set (jm::kChorus, 0.f);
 		rig.set (jm::kDelayMix, 0.f);
 		rig.set (jm::kRevMix, 0.f);
-		rig.set (jm::kBody, 0.f);
-		rig.set (jm::kBehindBridge, 0.f);
-		rig.set (jm::kAge, 0.f);
-		rig.set (jm::kSustain, 0.95f);
-		rig.set (jm::kBar, 0.f);
-		rig.set (jm::kBarLfoRate, 0.8f);
-		rig.set (jm::kBarLfoDepth, depth);
-		rig.play (64, 0.9f, 9600);
-		return rig.render (48000);
+		rig.set (jm::kBarDepth, depth);
+		rig.set (jm::kBarAtk, 0.05f);
+		rig.set (jm::kBarDec, 0.10f);
+		rig.set (jm::kBarSus, 0.50f);
+		rig.set (jm::kBarRel, 0.30f);
+		rig.e.noteOn (64, 0.9f);
+		rig.render (24000);          // 0.5 s: attack + decay done, sustain held
+		const float held = rig.e.barSemis ();
+		if (gateOff) rig.e.noteOff (64);
+		rig.render (48000);          // 1 s: release and spring settle
+		const float after = rig.e.barSemis ();
+		return std::pair<float, float> { held, after };
 	};
 
-	const auto flat = render (0.f);
-	const auto wobble = render (1.f);
-
-	auto scan = [] (const std::vector<float>& x, int from) {
-		std::vector<float> seg (x.begin () + from, x.begin () + from + 4096);
-		return peakFreq (seg, 48000.0, 270.0, 390.0, 0.2);
-	};
-
-	const double f0 = scan (flat, 20000);
-	const double lo = std::min (scan (wobble, 12000), scan (wobble, 32000));
-	const double hi = std::max (scan (wobble, 12000), scan (wobble, 32000));
+	const auto off = run (0.f, false);
+	const auto on = run (1.f, true);
 
 	char buf[200];
-	std::snprintf (buf, sizeof (buf), "flat %.1f Hz, wobble %.1f..%.1f Hz", f0, lo, hi);
-	check ("bar LFO off leaves the pitch alone", std::fabs (centsBetween (f0, 329.63)) < 15.0, buf);
-	check ("bar LFO moves the pitch", hi - lo > 15.0, buf);
-	check ("bar LFO stays inside the arm range", lo > 285.0 && hi < 380.0, buf);
+	std::snprintf (buf, sizeof (buf), "depth 0: %.2f st, depth 1: %.2f st held", off.first, on.first);
+	check ("depth 0 leaves the arm alone", std::fabs (off.first) < 0.05f, buf);
+	check ("envelope holds the dive at the sustain level",
+	       on.first < -1.0f && on.first > -3.2f, buf);
+	check ("release returns the arm to pitch", std::fabs (on.second) < 0.15f, buf);
 }
 
 
@@ -999,7 +995,7 @@ int main (int argc, char** argv)
 	testKeyswitches ();
 	testPerformanceModes ();
 	testLegato ();
-	testBarLfo ();
+	testBarEnvelope ();
 	testLowMasking ();
 	testSilence ();
 	testBlockSize ();

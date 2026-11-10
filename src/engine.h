@@ -344,6 +344,10 @@ public:
 
 		whammy.addEnergy (vel * 0.35f);
 
+		++held_;
+		if (envStage_ == 0) envStage_ = 1;      // retrigger from where we are
+		envGate_ = true;
+
 		lastNote_ = midiNote;
 		if (!retrigger) lastVel_ = clampf (velocity, 0.02f, 1.f);
 		lastFreq_ = f;
@@ -389,6 +393,8 @@ public:
 			else
 			{
 				voice[i] = -1;
+				if (held_ > 0) --held_;
+				if (held_ == 0 && envGate_) { envGate_ = false; envStage_ = 4; }
 				if (sustainPedal_)
 					sustained_[i] = true;
 				else
@@ -472,10 +478,34 @@ public:
 				}
 			}
 
-			barLfoPhase_ += barLfoRate_ / fs;
-			if (barLfoPhase_ >= 1.f) barLfoPhase_ -= 1.f;
-			const float barLfo = std::sin (kTwoPi * barLfoPhase_) * barLfoDepth_ * 0.25f;
-			whammy.setTarget (barParam_ + barLfo - bend_ + modWheel_ + aftertouch_ * 0.9f);
+			// ---- bar envelope ------------------------------------------
+			{
+				const float maxV = std::max (0.005f, barAtk_) * fs;
+				const float decV = std::max (0.005f, barDec_) * fs;
+				const float relV = std::max (0.005f, barRel_) * fs;
+				switch (envStage_)
+				{
+				case 1:
+					envLevel_ += 1.f / maxV;
+					if (envLevel_ >= 1.f) { envLevel_ = 1.f; envStage_ = 2; }
+					break;
+				case 2:
+					envLevel_ -= (1.f - barSus_) / decV;
+					if (envLevel_ <= barSus_) { envLevel_ = barSus_; envStage_ = 3; }
+					break;
+				case 3:
+					envLevel_ = barSus_;
+					break;
+				case 4:
+					envLevel_ -= 1.f / relV;
+					if (envLevel_ <= 0.f) { envLevel_ = 0.f; envStage_ = 0; }
+					break;
+				default:
+					envLevel_ = 0.f;
+					break;
+				}
+			}
+			whammy.setTarget (barParam_ + envLevel_ * barDepth_ - bend_ + modWheel_ + aftertouch_ * 0.9f);
 			whammy.tick ();
 
 			// ---- strings + pickups ---------------------------------------
@@ -582,6 +612,9 @@ public:
 	}
 
 	float barSemis () const { return whammy.semitones (); }
+	int envStage () const { return envStage_; }
+	int heldCount () const { return held_; }
+	float envValue () const { return envLevel_; }
 	float barAngle () const { return whammy.barAngle (); }
 	float activeStrings () const
 	{
@@ -645,8 +678,11 @@ private:
 		                          std::max (0, (int) (getParam (kTuning) + 0.5f))));
 
 		barParam_ = getParam (kBar);
-		barLfoRate_ = getParam (kBarLfoRate);
-		barLfoDepth_ = getParam (kBarLfoDepth);
+		barAtk_ = getParam (kBarAtk);
+		barDec_ = getParam (kBarDec);
+		barSus_ = getParam (kBarSus);
+		barRel_ = getParam (kBarRel);
+		barDepth_ = getParam (kBarDepth);
 
 		amp.setParams (getParam (kDrive), (int) (getParam (kDriveChar) + 0.5f),
 		               getParam (kBass), getParam (kMid), getParam (kTreble),
@@ -708,10 +744,14 @@ private:
 	int   revModeCur = -1;
 
 	float bend_ = 0.f, aftertouch_ = 0.f, modWheel_ = 0.f, barParam_ = 0.f;
-	// The bar's own LFO: an always-available vibrato that the spring model
-	// turns into a hand-like wobble instead of a stepped sine.
-	float barLfoPhase_ = 0.f, barLfoRate_ = 0.25f, barLfoDepth_ = 0.f;
+	// The bar's envelope: dive on the attack, hold, and come back on release.
+	// It is drawn as an ADSR panel; these are the stage values in seconds.
+	float barAtk_ = 0.25f, barDec_ = 0.4f, barSus_ = 0.45f, barRel_ = 0.7f, barDepth_ = 0.f;
+	float envLevel_ = 0.f;
+	int envStage_ = 0;          // 0 idle, 1 attack, 2 decay, 3 sustain, 4 release
+	int held_ = 0;
 	float expression_ = 1.f, expressionTarget_ = 1.f;
+	bool envGate_ = false;
 	bool sustainPedal_ = false;
 	bool sustained_[kNumStrings] = { false, false, false, false, false, false };
 	float swellEnv_[kNumStrings] = { 1.f, 1.f, 1.f, 1.f, 1.f, 1.f };

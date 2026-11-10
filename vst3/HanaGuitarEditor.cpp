@@ -70,8 +70,8 @@ const int kImageW = 509;          // artwork occupies the left edge, full height
 const int kX0 = 528;              // controls start here
 const int kRight = 1104;          // controls end here
 const int kKnobX = 618;           // knob area starts here (labels to the left)
-const int kRowY0 = 112;
-const int kRowH = 78;
+const int kRowY0 = 104;
+const int kRowH = 68;
 const int kPresetY = 68;
 const int kPresetH = 30;
 const int kLegendY = 592;
@@ -88,6 +88,8 @@ const Rgb kLine     {  34,  48,  76 };
 const Rgb kAccent   {  86, 208, 255 };
 const Rgb kAccent2  { 255, 106, 128 };
 const Rgb kLamp     { 126, 246, 176 };
+
+inline float clampf01 (float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
 
 inline ARGB argb (const Rgb& c, int a = 255)
 {
@@ -124,16 +126,17 @@ struct RowDef
 	int extra;       // row 2 starts with the circuit switch
 };
 
-const RowDef kRows[6] = {
+const RowDef kRows[7] = {
 	{ "STRING",  kSustain,    3, 0 },
 	{ "PICKUP",  kPickupSel,  5, 0 },
 	{ "CIRCUIT", kVolume,     3, 1 },   // the switch comes first
 	{ "AMP",     kDrive,      7, 0 },
 	{ "SPACE",   kChorus,     6, 0 },
-	{ "MASTER",  kTremRate,   7, 0 },
+	{ "MASTER",  kTremRate,   5, 0 },
+	{ "WHAMMY",  kBarAtk,     0, 2 },   // the ADSR panel, not knobs
 };
 
-const int kNumRows = 6;
+const int kNumRows = 7;
 
 // ---------------------------------------------------------------------------
 // IPlugView has no message channel.  The editor registers its window against
@@ -312,6 +315,9 @@ private:
 	void drawKnobs (GpGraphics* g);
 	void drawKnob (GpGraphics* g, const Knob& k);
 	void drawCircuitSwitch (GpGraphics* g);
+	void drawBarEnv (GpGraphics* g);
+	int envHandleAt (int x, int y) const;
+	void envDragTo (int handle, int x, int y);
 	void drawLegend (GpGraphics* g);
 	void drawFooter (GpGraphics* g);
 
@@ -355,6 +361,8 @@ private:
 	RectI circuitSwitch_;
 	RectI presetBtn_[4];
 	RectI barRect_;
+	RectI envRect_;
+	int envDrag_ = -1;
 
 	int dragId_ = -1;
 	int dragY0_ = 0;
@@ -421,7 +429,7 @@ void HanaGuitarEditor::buildLayout ()
 		const int y = kRowY0 + r * kRowH;
 
 		int slot = 0;
-		if (row.extra)
+		if (row.extra == 1)
 		{
 			circuitSwitch_.x = kKnobX + 6;
 			circuitSwitch_.y = y + 18;
@@ -443,6 +451,8 @@ void HanaGuitarEditor::buildLayout ()
 	}
 
 	barRect_ = { kRight - 152, 4, 152, 30 };
+	envRect_ = { kKnobX, kRowY0 + (kNumRows - 1) * kRowH + 5,
+	             kRight - kKnobX, kRowH - 10 };
 
 	for (int i = 0; i < 4; ++i)
 	{
@@ -709,8 +719,26 @@ void HanaGuitarEditor::syncToParent ()
 
 void HanaGuitarEditor::designFromWindow (int wx, int wy, int& dx, int& dy) const
 {
-	dx = (int) ((wx - offX_) / std::max (0.01f, scaleXY_));
-	dy = (int) ((wy - offY_) / std::max (0.01f, scaleXY_));
+	// Derive the mapping from the live client rect: a host can resize us
+	// without a repaint, and a stale scale would make every click miss.
+	float scale = scaleXY_;
+	int ox = offX_, oy = offY_;
+	if (hwnd_)
+	{
+		RECT rc = {};
+		GetClientRect (hwnd_, &rc);
+		const int cw = (int) (rc.right - rc.left);
+		const int chh = (int) (rc.bottom - rc.top);
+		if (cw >= 8 && chh >= 8)
+		{
+			scale = std::min ((float) cw / (float) kW, (float) chh / (float) kH);
+			ox = (int) ((cw - kW * scale) * 0.5f);
+			oy = (int) ((chh - kH * scale) * 0.5f);
+		}
+	}
+	scale = std::max (0.01f, scale);
+	dx = (int) ((wx - ox) / scale);
+	dy = (int) ((wy - oy) / scale);
 }
 
 // ---------------------------------------------------------------------------
@@ -922,14 +950,15 @@ void HanaGuitarEditor::drawKnobs (GpGraphics* g)
 		txt (g, brDim_, fLabel_, kRows[r].label, kX0, y + 30, 80, 16);
 	}
 	drawCircuitSwitch (g);
+	drawBarEnv (g);
 	for (int i = 0; i < knobCount_; ++i) drawKnob (g, knobs[i]);
 }
 
 void HanaGuitarEditor::drawKnob (GpGraphics* g, const Knob& k)
 {
 	const float cx = k.r.cx ();
-	const float cy = k.r.y + 38.f;
-	const float rad = 20.f;
+	const float cy = k.r.y + 34.f;
+	const float rad = 18.f;
 
 	char label[64];
 	std::snprintf (label, sizeof (label), "%s", kParamDefs[k.id].name);
@@ -959,7 +988,7 @@ void HanaGuitarEditor::drawKnob (GpGraphics* g, const Knob& k)
 	// value
 	char val[48];
 	formatValue (k.id, v, val, sizeof (val));
-	txt (g, brInk_, fValue_, val, k.r.x, k.r.y + 58, k.r.w, 16, 1);
+	txt (g, brInk_, fValue_, val, k.r.x, k.r.y + 52, k.r.w, 14, 1);
 }
 
 void HanaGuitarEditor::drawCircuitSwitch (GpGraphics* g)
@@ -987,7 +1016,129 @@ void HanaGuitarEditor::drawCircuitSwitch (GpGraphics* g)
 	     r.x + r.w / 2, r.y + r.h / 2 - 7, r.w / 2, 14, 1);
 }
 
+
+// ---------------------------------------------------------------------------
+// The whammy's ADSR panel.  Four handles: attack (where the peak sits on the
+// time axis), peak height (depth), decay/sustain corner (time and level) and
+// release.
+// ---------------------------------------------------------------------------
+void HanaGuitarEditor::drawBarEnv (GpGraphics* g)
+{
+	const RectI& r = envRect_;
+	fillRound (g, brPanelHi_, r.x, r.y, r.w, r.h, 5);
+	line (g, penLine_, r.x, r.y, r.x + r.w, r.y);
+
+	const float A = plainFromNorm (kParamDefs[kBarAtk], (float) valueOf (kBarAtk));
+	const float D = plainFromNorm (kParamDefs[kBarDec], (float) valueOf (kBarDec));
+	const float S = plainFromNorm (kParamDefs[kBarSus], (float) valueOf (kBarSus));
+	const float R = plainFromNorm (kParamDefs[kBarRel], (float) valueOf (kBarRel));
+	const float depth = plainFromNorm (kParamDefs[kBarDepth], (float) valueOf (kBarDepth));
+
+	const float x0 = (float) r.x + 10.f;
+	const float xR = (float) r.x + (float) r.w - 10.f;
+	const float span = xR - x0;
+	const float yB = (float) r.y + (float) r.h - 7.f;
+	const float yT = (float) r.y + 16.f;
+
+	const float ax = x0 + std::min (span * 0.86f, span * (A / 4.f));
+	const float dx = std::min (xR - span * 0.12f, ax + std::min (span * 0.22f, span * (D / 4.f)));
+	const float plateau = span * 0.12f;
+	const float rx = std::min (xR, dx + plateau + span * (R / 4.f));
+	const float yP = yB - (yB - yT) * depth;
+	const float yS = yB - (yB - yT) * (S * depth);
+
+	fillRect (g, brLine_, (int) x0, (int) yB, (int) span, 1);
+	line (g, penDim_, (int) x0, (int) yT, (int) xR, (int) yT);
+	line (g, penDim_, (int) ax, (int) yT, (int) ax, (int) yB);
+	line (g, penDim_, (int) dx, (int) yT, (int) dx, (int) yB);
+	line (g, penDim_, (int) rx, (int) yT, (int) rx, (int) yB);
+
+	const float px[5] = { x0, ax, dx, dx + plateau, rx };
+	const float py[5] = { yB, yP, yS, yS, yB };
+	for (int i = 0; i < 4; ++i)
+		line (g, penAccent_, (int) px[i], (int) py[i], (int) px[i + 1], (int) py[i + 1]);
+
+	ellipse (g, brAccent_, (int) ax - 4, (int) yP - 4, 8, 8);
+	ellipse (g, brPanelHi_, (int) ax - 4, (int) yB - 4, 8, 8);
+	ellipse (g, brAccent_, (int) dx - 4, (int) yS - 4, 8, 8);
+	ellipse (g, brLamp_, (int) rx - 4, (int) yB - 4, 8, 8);
+
+	char buf[96];
+	std::snprintf (buf, sizeof (buf), "A %.2fs   D %.2fs   S %.2f   R %.2fs   Depth %.2f",
+	               A, D, S, R, depth);
+	txt (g, brDim_, fTiny_, buf, r.x + 6, r.y + 1, r.w - 10, 12);
+	if (depth < 0.01f)
+		txt (g, brDim_, fTiny_, "drag the peak up to enable", r.x + 6, r.y + (r.h / 2) - 6, r.w - 12, 12, 1);
+}
+
+int HanaGuitarEditor::envHandleAt (int x, int y) const
+{
+	const float A = plainFromNorm (kParamDefs[kBarAtk], (float) valueOf (kBarAtk));
+	const float D = plainFromNorm (kParamDefs[kBarDec], (float) valueOf (kBarDec));
+	const float S = plainFromNorm (kParamDefs[kBarSus], (float) valueOf (kBarSus));
+	const float R = plainFromNorm (kParamDefs[kBarRel], (float) valueOf (kBarRel));
+	const float depth = plainFromNorm (kParamDefs[kBarDepth], (float) valueOf (kBarDepth));
+
+	const RectI& r = envRect_;
+	const float x0 = (float) r.x + 10.f;
+	const float xR = (float) r.x + (float) r.w - 10.f;
+	const float span = xR - x0;
+	const float yB = (float) r.y + (float) r.h - 7.f;
+	const float yT = (float) r.y + 16.f;
+
+	const float ax = x0 + std::min (span * 0.86f, span * (A / 4.f));
+	const float dx = std::min (xR - span * 0.12f, ax + std::min (span * 0.22f, span * (D / 4.f)));
+	const float plateau = span * 0.12f;
+	const float rx = std::min (xR, dx + plateau + span * (R / 4.f));
+	const float yP = yB - (yB - yT) * depth;
+	const float yS = yB - (yB - yT) * (S * depth);
+
+	const float pts[4][2] = { { ax, yP }, { dx, yS }, { rx, yB }, { ax, yB } };
+	for (int i = 0; i < 4; ++i)
+		if (std::fabs ((float) x - pts[i][0]) < 8.f && std::fabs ((float) y - pts[i][1]) < 8.f)
+			return i;
+	return -1;
+}
+
+void HanaGuitarEditor::envDragTo (int handle, int x, int y)
+{
+	if (!sink_) return;
+	const RectI& r = envRect_;
+	const float x0 = (float) r.x + 10.f;
+	const float xR = (float) r.x + (float) r.w - 10.f;
+	const float span = std::max (1.f, xR - x0);
+	const float yB = (float) r.y + (float) r.h - 7.f;
+	const float yT = (float) r.y + 16.f;
+
+	const float A = plainFromNorm (kParamDefs[kBarAtk], (float) valueOf (kBarAtk));
+	const float D = plainFromNorm (kParamDefs[kBarDec], (float) valueOf (kBarDec));
+
+	auto set = [&] (int id, float plain) {
+		sink_->onPerformEdit (id, (double) normFromPlain (kParamDefs[id], plain));
+	};
+
+	if (handle == 0)
+		set (kBarAtk, clampf01 ((float) (x - x0) / span * 4.f, 0.005f, 3.f));
+	else if (handle == 1)
+		set (kBarDepth, clampf01 ((yB - (float) y) / std::max (1.f, yB - yT), 0.f, 1.f));
+	else if (handle == 2)
+	{
+		const float ax = x0 + std::min (span * 0.86f, span * (A / 4.f));
+		set (kBarDec, clampf01 ((float) x - ax, 0.f, 1e9f) / span * 4.f);
+		set (kBarSus, clampf01 ((yB - (float) y) / std::max (1.f, yB - yT), 0.f, 1.f));
+	}
+	else if (handle == 3)
+	{
+		const float ax = x0 + std::min (span * 0.86f, span * (A / 4.f));
+		const float dx = std::min (xR - span * 0.12f, ax + std::min (span * 0.22f, span * (D / 4.f)));
+		const float plateau = span * 0.12f;
+		set (kBarRel, clampf01 (((float) x - dx - plateau) / span * 4.f, 0.005f, 4.f));
+	}
+	InvalidateRect (hwnd_, nullptr, FALSE);
+}
+
 void HanaGuitarEditor::drawLegend (GpGraphics* g)
+
 {
 	fillRect (g, brLine_, kX0, kLegendY, kRight - kX0, 1);
 	txt (g, brDim_, fLabel_, "KEY SWITCHES  (C0..D#1, below the played range)", kX0, kLegendY + 4, 380, 14);
@@ -1015,7 +1166,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.4", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.5", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1213,6 +1364,11 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 	{
 		int dx, dy;
 		designFromWindow (GET_X_LPARAM (l), GET_Y_LPARAM (l), dx, dy);
+		if (envDrag_ >= 0)
+		{
+			envDragTo (envDrag_, dx, dy);
+			return 0;
+		}
 		if (dragId_ >= 0)
 		{
 			dragTo (dx, dy);
@@ -1240,6 +1396,17 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 
 		if (circuitSwitch_.has (dx, dy)) { toggleCircuit (); return 0; }
 
+		if (envRect_.has (dx, dy))
+		{
+			envDrag_ = envHandleAt (dx, dy);
+			if (envDrag_ >= 0)
+			{
+				for (int id : { (int) kBarAtk, (int) kBarDec, (int) kBarSus, (int) kBarRel, (int) kBarDepth })
+					sink_->onBeginEdit (id);
+			}
+			return 0;
+		}
+
 		if (barRect_.has (dx, dy)) { beginDrag (jm::kBar, dx, dy); return 0; }
 
 		const int id = knobAt (dx, dy);
@@ -1259,6 +1426,12 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 
 	case WM_LBUTTONUP:
 		if (GetCapture () == h) ReleaseCapture ();
+		if (envDrag_ >= 0)
+		{
+			for (int id : { (int) kBarAtk, (int) kBarDec, (int) kBarSus, (int) kBarRel, (int) kBarDepth })
+				sink_->onEndEdit (id);
+			envDrag_ = -1;
+		}
 		endDrag ();
 		InvalidateRect (h, nullptr, FALSE);
 		return 0;

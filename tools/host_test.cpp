@@ -980,6 +980,14 @@ int main (int argc, char** argv)
 					SetWindowPos (parent, nullptr, 0, 0, vw, vh,
 					              SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 				}
+				// give the ADSR panel a visible shape for the screenshot
+				driveParam (rig, jm::kBarAtk, (double) jm::normFromPlain (jm::kParamDefs[jm::kBarAtk], 0.25f));
+				driveParam (rig, jm::kBarDec, (double) jm::normFromPlain (jm::kParamDefs[jm::kBarDec], 0.55f));
+				driveParam (rig, jm::kBarSus, (double) jm::normFromPlain (jm::kParamDefs[jm::kBarSus], 0.45f));
+				driveParam (rig, jm::kBarRel, (double) jm::normFromPlain (jm::kParamDefs[jm::kBarRel], 1.00f));
+				driveParam (rig, jm::kBarDepth, (double) jm::normFromPlain (jm::kParamDefs[jm::kBarDepth], 0.75f));
+				rig.render (256, nullptr, nullptr, nullptr);
+				SendMessageW (child, WM_PAINT, 0, 0);
 				saveWindowBmp (child, vw, vh, "build/panel.bmp");
 
 				// The panel must be interactive: click the SHOEGAZE preset.
@@ -1006,7 +1014,7 @@ int main (int argc, char** argv)
 				// (there is no arm to drag any more -- the bar is CC-driven).
 				{
 					driveParam (rig, jm::kCircuit, 0.0);
-					const int sx = 666, sy = 316;
+					const int sx = 666, sy = 276;
 					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (sx, sy));
 					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (sx, sy));
 					const double after = rig.getParam (jm::kCircuit);

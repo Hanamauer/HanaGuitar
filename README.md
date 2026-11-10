@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.4
+# HanaGuitar for indie 1.5
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -51,7 +51,8 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 | CIRCUIT | Circuit（LEAD/RHY 开关）、Volume、Tone、Rhythm Tone |
 | AMP | Drive、Character、Bass、Mid、Treble、Presence、Cabinet |
 | SPACE | Chorus、Delay Time、Delay Mix、Reverb Size、Reverb Mix、Width |
-| MASTER | Trem Rate、Trem Depth、Bar Rate、Bar Depth、Tuning、Reverb Mode、Output |
+| MASTER | Trem Rate、Trem Depth、Tuning、Reverb Mode、Output |
+| WHAMMY | ADSR 面板：Attack / Decay / Sustain / Release / Depth |
 
 其他控件：
 
@@ -103,12 +104,14 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 | **CC1**（调制轮） | 0→127 | 0→全下潜（4 个半音）；回 0 弹簧回弹 |
 | **Pitch Bend** | ±1 | 下潜 / 上提；松手自动回中 |
 | **`Bar` 参数** | 宿主自动化（0→1） | 给不转发 CC 的宿主（FL 等） |
-| **Bar Rate / Bar Depth** | MASTER 行两个旋钮 | 内置 LFO，自动晃动 |
+| **WHAMMY ADSR 面板** | MASTER 下面一行，拖动四个点 | 每个 note 自动沉下去再回来 |
 
 * 范围固定 **4 个半音**，弹簧 **2.4 Hz**：CC 跳变会有过冲（“boing”），
   慢画曲线就是 shoegaze 的慢 glide。
-* **LFO**：Rate 0.03–8 Hz，Depth 0 = 关、1 ≈ ±1 个半音。它叠加在 CC / 自动化
-  之上，所以可以“手推着摇把 + LFO 微颤”。
+* **ADSR 面板**（MASTER 下面一行）：峰值上下拖 = Depth（1.0 = 全下潜 4 个半音），
+  峰值左右 = Attack，中间拐点 = Decay/Sustain，右端 = Release。note-on 触发、
+  note-off 释放；它叠加在 CC / 自动化之上，所以可以“手推着摇把 + 包络自动沉”。
+  Depth = 0 时是一条平线（默认关闭）。
 * **CC11 不是摇把**（是音量表情），**CC64** 是延音踏板。
 
 ---
@@ -203,11 +206,14 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 | 24 | Width | 0–1 | 0.60 |
 | 25 | Trem Rate | 0.2–12 Hz | 3.5 |
 | 26 | Trem Depth | 0–1 | 0 |
-| 27 | Bar Rate | 0.03–8 Hz | 0.25 |
-| 28 | Bar Depth | 0–1 | 0 |
-| 29 | Tuning | Standard / Drop D / Eb / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
-| 30 | Reverb Mode | Room/Hall/Plate/Gate/Reverse | Hall |
-| 31 | Output | −30…+12 dB | −4 |
+| 27 | Bar Attack | 0.005–3 s | 0.25 |
+| 28 | Bar Decay | 0.005–3 s | 0.40 |
+| 29 | Bar Sustain | 0–1 | 0.45 |
+| 30 | Bar Release | 0.005–4 s | 0.70 |
+| 31 | Bar Depth | 0–1 | 0 |
+| 32 | Tuning | Standard / Drop D / Eb / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
+| 33 | Reverb Mode | Room/Hall/Plate/Gate/Reverse | Hall |
+| 34 | Output | −30…+12 dB | −4 |
 | — | Preset | 4 个 | Clean JM |
 | — | Bar | 0–1（自动化） | 0 |
 
@@ -322,6 +328,7 @@ build\host_test.exe    63 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.5 | **HanaGuitar for indie** | 摇把改成可拖拽的 ADSR 面板（取代 Bar Rate/Depth 旋钮），note-on 触发 / note-off 释放 |
 | 1.4 | **HanaGuitar for indie** | 低音不再“吃掉”后面的音：共鸣器组高通 + 降增益、sag 改用整流包络 |
 | 1.3 | **HanaGuitar for indie** | 更长延音/更慢弹簧、攻击性、空腔共振、tapping/legato 重做、Bar 参数 + LFO、面板尺寸/黑屏修复 |
 
