@@ -1071,6 +1071,42 @@ int main (int argc, char** argv)
 
 			check ("removed", view->removed () == kResultOk);
 			view->release ();
+
+			// ---- reload: a fresh view on the same plugin and parent ----
+			// Hosts do this every time the plugin window is closed and opened
+			// again.  The panel must come back painted, not black.
+			{
+				IPlugView* v2 = rig.ctrl->createView (ViewType::kEditor);
+				check ("reload: createView", v2 != nullptr);
+				if (v2)
+				{
+					check ("reload: attached",
+					       v2->attached (parent, kPlatformTypeHWND) == kResultOk);
+					HWND c2 = FindWindowExW (parent, nullptr, L"HanaGuitarPanel", nullptr);
+					check ("reload: window exists", c2 != nullptr);
+					if (c2)
+					{
+						ViewRect rr{ 0, 0, vw, vh };
+						v2->onSize (&rr);
+						MSG m2;
+						const DWORD until = GetTickCount () + 200;
+						while (GetTickCount () < until)
+						{
+							while (PeekMessageW (&m2, nullptr, 0, 0, PM_REMOVE))
+							{
+								TranslateMessage (&m2);
+								DispatchMessageW (&m2);
+							}
+							Sleep (5);
+						}
+						const int lit = paintNonBlack (c2, vw, vh);
+						std::snprintf (msg, sizeof (msg), "(%d lit pixels)", lit);
+						check ("reload: panel paints, not black", lit > 1000, msg);
+					}
+					v2->removed ();
+					v2->release ();
+				}
+			}
 		}
 	}
 

@@ -349,6 +349,7 @@ private:
 
 	HWND hwnd_ = nullptr;
 	HWND parent_ = nullptr;
+	HINSTANCE hinst_ = nullptr;
 	IPlugFrame* frame_ = nullptr;
 	float scale_ = 1.f;
 	float scaleHint_ = 1.f;
@@ -469,6 +470,7 @@ void HanaGuitarEditor::buildLayout ()
 // ---------------------------------------------------------------------------
 bool HanaGuitarEditor::initGdi ()
 {
+	if (gdiOk_ && fTitle_ && brPanel_) return true;   // already up: reload path
 	GdiplusStartupInput in;
 	if (GdiplusStartup (&gdiToken_, &in, nullptr) != Ok) return false;
 	gdiOk_ = true;
@@ -548,36 +550,13 @@ bool HanaGuitarEditor::initGdi ()
 
 void HanaGuitarEditor::shutdownGdi ()
 {
-	if (!gdiOk_) return;
-	if (hero_) { GdipDisposeImage (hero_); hero_ = nullptr; }
-	if (fTitle_) GdipDeleteFont (fTitle_);
-	if (fLabel_) GdipDeleteFont (fLabel_);
-	if (fValue_) GdipDeleteFont (fValue_);
-	if (fSmall_) GdipDeleteFont (fSmall_);
-	if (fTiny_) GdipDeleteFont (fTiny_);
-	if (fPreset_) GdipDeleteFont (fPreset_);
-	if (ff_) GdipDeleteFontFamily (ff_);
-	if (ffBold_) GdipDeleteFontFamily (ffBold_);
-	if (fmtL_) GdipDeleteStringFormat (fmtL_);
-	if (fmtC_) GdipDeleteStringFormat (fmtC_);
-	if (fmtR_) GdipDeleteStringFormat (fmtR_);
-	if (brBg_) GdipDeleteBrush (brBg_);
-	if (brPanel_) GdipDeleteBrush (brPanel_);
-	if (brPanelHi_) GdipDeleteBrush (brPanelHi_);
-	if (brInk_) GdipDeleteBrush (brInk_);
-	if (brDim_) GdipDeleteBrush (brDim_);
-	if (brLine_) GdipDeleteBrush (brLine_);
-	if (brAccent_) GdipDeleteBrush (brAccent_);
-	if (brAccent2_) GdipDeleteBrush (brAccent2_);
-	if (brLamp_) GdipDeleteBrush (brLamp_);
-	if (gradRight_) GdipDeleteBrush (gradRight_);
-	if (gradBottom_) GdipDeleteBrush (gradBottom_);
-	if (gradPanel_) GdipDeleteBrush (gradPanel_);
-	if (penLine_) GdipDeletePen (penLine_);
-	if (penAccent_) GdipDeletePen (penAccent_);
-	if (penDim_) GdipDeletePen (penDim_);
-	if (penTrack_) GdipDeletePen (penTrack_);
-	if (gdiOk_) { GdiplusShutdown (gdiToken_); gdiOk_ = false; }
+	// Deliberately does *not* call GdiplusShutdown and does not delete the GDI+
+	// objects.  A plugin that starts and stops GDI+ while the host is also
+	// using it is the textbook cause of "the panel is black after reopening
+	// the plugin": the second GdiplusStartup can come back with a broken
+	// process state.  These objects are a few kilobytes; they live for the
+	// lifetime of the process, and every attach reuses them.
+	gdiOk_ = (gdiToken_ != 0);
 }
 
 bool HanaGuitarEditor::ensureSurface ()
@@ -644,9 +623,12 @@ tresult PLUGIN_API HanaGuitarEditor::attached (void* parent, FIDString type)
 		winH_ = ph > 16 ? ph : kH;
 	}
 	if (!initGdi ()) { uiLog ("initGdi-failed", 0, 0); return kResultFalse; }
-	if (!makeWindow (parent_)) return kResultFalse;
+	if (hwnd_) { DestroyWindow (hwnd_); hwnd_ = nullptr; }
+	if (!makeWindow (parent_)) { uiLog ("makeWindow-failed", 0, 0); return kResultFalse; }
 	layoutToWindow (winW_, winH_);
 	syncToParent ();
+	InvalidateRect (hwnd_, nullptr, TRUE);
+	UpdateWindow (hwnd_);              // never show an unpainted (black) window
 	uiLog ("attached", winW_, winH_);
 	viewMap ().add (this, hwnd_);
 	SetTimer (hwnd_, 1, 50, nullptr);
@@ -819,6 +801,7 @@ void HanaGuitarEditor::paint (HDC dc)
 	offX_ = (int) ((cw - kW * scaleXY_) * 0.5f);
 	offY_ = (int) ((ch - kH * scaleXY_) * 0.5f);
 
+	if (!gdiOk_) initGdi ();
 	if (!gdiOk_)
 	{
 		// GDI+ failed to start: still paint something readable, so the panel is
@@ -1166,7 +1149,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.5", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.6", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
