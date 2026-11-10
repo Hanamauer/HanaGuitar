@@ -345,6 +345,6 @@ build.bat       一键构建（g++ + VST3 SDK）
 `
 
 * 代码：MIT，见 LICENSE。
-* st3/hero.jpg 是参考图，**不在 MIT 范围内**；二次分发请换成你自己的图，
+* st3/hero.jpg 是参考图，使用ChatGPT以Shoegaze樂隊My bloody Valentine主唱Bilinda Butcher為原型生成，二次分发请换成你自己的图，
   见 st3/ARTWORK.md。
 * 构建需要 VST3 SDK（不随仓库分发）；uild.bat 顶部的 SDK 指向本地 SDK。
