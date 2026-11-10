@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.6
+# HanaGuitar for indie 1.7
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -51,8 +51,8 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 | CIRCUIT | Circuit（LEAD/RHY 开关）、Volume、Tone、Rhythm Tone |
 | AMP | Drive、Character、Bass、Mid、Treble、Presence、Cabinet |
 | SPACE | Chorus、Delay Time、Delay Mix、Reverb Size、Reverb Mix、Width |
-| MASTER | Trem Rate、Trem Depth、Tuning、Reverb Mode、Output |
-| WHAMMY | ADSR 面板：Attack / Decay / Sustain / Release / Depth |
+| MASTER | Trem Rate、Trem Depth、Flutter、Tuning、Reverb Mode、Output |
+| WHAMMY | DIVE/LIFT 开关 + ADSR 面板：Attack / Decay / Sustain / Release / Depth |
 
 其他控件：
 
@@ -108,10 +108,25 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 
 * 范围固定 **4 个半音**，弹簧 **2.4 Hz**：CC 跳变会有过冲（“boing”），
   慢画曲线就是 shoegaze 的慢 glide。
-* **ADSR 面板**（MASTER 下面一行）：峰值上下拖 = Depth（1.0 = 全下潜 4 个半音），
-  峰值左右 = Attack，中间拐点 = Decay/Sustain，右端 = Release。note-on 触发、
-  note-off 释放；它叠加在 CC / 自动化之上，所以可以“手推着摇把 + 包络自动沉”。
-  Depth = 0 时是一条平线（默认关闭）。
+* **ADSR 面板**（MASTER 下面一行）：峰值上下拖 = Depth，峰值左右 = Attack，
+  中间拐点 = Decay/Sustain，右端 = Release。note-on 触发、note-off 释放；
+  叠加在 CC / 自动化之上。Depth = 0 时是一条平线（默认关闭）。
+* **DIVE / LIFT**（面板左边的开关）：Jazzmaster 的浮动摇座是双向的——往下压降
+  音高（−4 个半音），往上抬升音高（+2 个半音）。LIFT 让包络把摇把往上拉，
+  DIVE 是常规下潜。包络的深度、A/D/S/R 在两种方向下都有效。
+* **Trem-Lock**：真琴上的锁定按钮会限制上拉。这里没有单独的锁，想模拟“锁上”
+  就留在 DIVE；想反向上拉就切 LIFT。
+* **Flutter**（MASTER 行）：摇把自身的快速细碎抖动，0–1。
+
+### 五种摇把动作怎么弹
+
+| 动作 | 设置 |
+|---|---|
+| 向下颤音 | DIVE，Depth 0.15–0.25，A/R 0.1–0.2 s，S 0.4 |
+| 向上颤音 | **LIFT**，Depth 0.15–0.25，A/R 0.1–0.2 s |
+| 慢速 pitch swell | A 0.8–2 s、R 0.8–1.5 s、Depth 0.3–0.6（DIVE 或 LIFT） |
+| 大幅上下摇 | 用 CC1 / `Bar` 参数画正弦，或包络 Depth 0.6+ |
+| Flutter | Flutter 旋钮 + 颤音拨弦（C#1），摇把只做微小偏移 |
 * **CC11 不是摇把**（是音量表情），**CC64** 是延音踏板。
 
 ---
@@ -206,14 +221,16 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 | 24 | Width | 0–1 | 0.60 |
 | 25 | Trem Rate | 0.2–12 Hz | 3.5 |
 | 26 | Trem Depth | 0–1 | 0 |
-| 27 | Bar Attack | 0.005–3 s | 0.25 |
-| 28 | Bar Decay | 0.005–3 s | 0.40 |
-| 29 | Bar Sustain | 0–1 | 0.45 |
-| 30 | Bar Release | 0.005–4 s | 0.70 |
-| 31 | Bar Depth | 0–1 | 0 |
-| 32 | Tuning | Standard / Drop D / Eb / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
-| 33 | Reverb Mode | Room/Hall/Plate/Gate/Reverse | Hall |
-| 34 | Output | −30…+12 dB | −4 |
+| 27 | Flutter | 0–1 | 0.30 |
+| 28 | Tuning | Standard / Drop D / Eb / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
+| 29 | Reverb Mode | Room/Hall/Plate/Gate/Reverse | Hall |
+| 30 | Output | −30…+12 dB | −4 |
+| 31 | Bar Attack | 0.005–3 s | 0.25 |
+| 32 | Bar Decay | 0.005–3 s | 0.40 |
+| 33 | Bar Sustain | 0–1 | 0.45 |
+| 34 | Bar Release | 0.005–4 s | 0.70 |
+| 35 | Bar Depth | 0–1 | 0 |
+| 36 | Bar Dir | Dive / Lift | Dive |
 | — | Preset | 4 个 | Clean JM |
 | — | Bar | 0–1（自动化） | 0 |
 
@@ -328,6 +345,7 @@ build\host_test.exe    67 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.7 | **HanaGuitar for indie** | 摇把支持上拉：DIVE/LIFT 方向、+2 半音上行程、Flutter 旋钮 |
 | 1.6 | **HanaGuitar for indie** | reload 黑屏修复：窗口类注册到插件 DLL（不再是宿主 EXE），GDI+ 不再随视图销毁 |
 | 1.5 | **HanaGuitar for indie** | 摇把改成可拖拽的 ADSR 面板（取代 Bar Rate/Depth 旋钮），note-on 触发 / note-off 释放 |
 | 1.4 | **HanaGuitar for indie** | 低音不再“吃掉”后面的音：共鸣器组高通 + 降增益、sag 改用整流包络 |

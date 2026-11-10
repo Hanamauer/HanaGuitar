@@ -132,7 +132,7 @@ const RowDef kRows[7] = {
 	{ "CIRCUIT", kVolume,     3, 1 },   // the switch comes first
 	{ "AMP",     kDrive,      7, 0 },
 	{ "SPACE",   kChorus,     6, 0 },
-	{ "MASTER",  kTremRate,   5, 0 },
+	{ "MASTER",  kTremRate,   6, 0 },
 	{ "WHAMMY",  kBarAtk,     0, 2 },   // the ADSR panel, not knobs
 };
 
@@ -363,6 +363,7 @@ private:
 	RectI presetBtn_[4];
 	RectI barRect_;
 	RectI envRect_;
+	RectI barDirRect_;
 	int envDrag_ = -1;
 
 	int dragId_ = -1;
@@ -452,8 +453,11 @@ void HanaGuitarEditor::buildLayout ()
 	}
 
 	barRect_ = { kRight - 152, 4, 152, 30 };
-	envRect_ = { kKnobX, kRowY0 + (kNumRows - 1) * kRowH + 5,
-	             kRight - kKnobX, kRowH - 10 };
+	{
+		const int wy = kRowY0 + (kNumRows - 1) * kRowH;
+		barDirRect_ = { kKnobX + 4, wy + 20, 80, 26 };
+		envRect_ = { kKnobX + 94, wy + 5, kRight - (kKnobX + 94), kRowH - 10 };
+	}
 
 	for (int i = 0; i < 4; ++i)
 	{
@@ -1007,6 +1011,16 @@ void HanaGuitarEditor::drawCircuitSwitch (GpGraphics* g)
 // ---------------------------------------------------------------------------
 void HanaGuitarEditor::drawBarEnv (GpGraphics* g)
 {
+	{
+		const RectI& d = barDirRect_;
+		const bool lift = plainFromNorm (kParamDefs[kBarDir], (float) valueOf (kBarDir)) > 0.5f;
+		fillRound (g, brPanel_, d.x, d.y, d.w, d.h, 5);
+		if (lift) fillRound (g, brAccent2_, d.x + d.w / 2, d.y + 2, d.w / 2 - 2, d.h - 4, 4);
+		else fillRound (g, brAccent_, d.x + 2, d.y + 2, d.w / 2 - 2, d.h - 4, 4);
+		txt (g, lift ? brDim_ : brInk_, fTiny_, "DIVE", d.x, d.y + 6, d.w / 2, 14, 1);
+		txt (g, lift ? brInk_ : brDim_, fTiny_, "LIFT", d.x + d.w / 2, d.y + 6, d.w / 2, 14, 1);
+	}
+
 	const RectI& r = envRect_;
 	fillRound (g, brPanelHi_, r.x, r.y, r.w, r.h, 5);
 	line (g, penLine_, r.x, r.y, r.x + r.w, r.y);
@@ -1036,10 +1050,15 @@ void HanaGuitarEditor::drawBarEnv (GpGraphics* g)
 	line (g, penDim_, (int) dx, (int) yT, (int) dx, (int) yB);
 	line (g, penDim_, (int) rx, (int) yT, (int) rx, (int) yB);
 
+	const bool liftDir = plainFromNorm (kParamDefs[kBarDir], (float) valueOf (kBarDir)) > 0.5f;
+	GpPen* curvePen = penAccent_;
+	if (liftDir) GdipCreatePen1 (argb (kAccent2), 2.f, UnitPixel, &curvePen);
+
 	const float px[5] = { x0, ax, dx, dx + plateau, rx };
 	const float py[5] = { yB, yP, yS, yS, yB };
 	for (int i = 0; i < 4; ++i)
-		line (g, penAccent_, (int) px[i], (int) py[i], (int) px[i + 1], (int) py[i + 1]);
+		line (g, curvePen, (int) px[i], (int) py[i], (int) px[i + 1], (int) py[i + 1]);
+	if (liftDir) GdipDeletePen (curvePen);
 
 	ellipse (g, brAccent_, (int) ax - 4, (int) yP - 4, 8, 8);
 	ellipse (g, brPanelHi_, (int) ax - 4, (int) yB - 4, 8, 8);
@@ -1149,7 +1168,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.6", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.7", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1378,6 +1397,16 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 			if (presetBtn_[i].has (dx, dy)) { applyPreset (i); return 0; }
 
 		if (circuitSwitch_.has (dx, dy)) { toggleCircuit (); return 0; }
+
+		if (barDirRect_.has (dx, dy))
+		{
+			const double cur = valueOf (kBarDir);
+			sink_->onBeginEdit (kBarDir);
+			sink_->onPerformEdit (kBarDir, cur > 0.5 ? 0.0 : 1.0);
+			sink_->onEndEdit (kBarDir);
+			InvalidateRect (h, nullptr, FALSE);
+			return 0;
+		}
 
 		if (envRect_.has (dx, dy))
 		{

@@ -505,7 +505,8 @@ public:
 					break;
 				}
 			}
-			whammy.setTarget (barParam_ + envLevel_ * barDepth_ - bend_ + modWheel_ + aftertouch_ * 0.9f);
+			whammy.setTarget (barParam_ + envLevel_ * barDepth_ * barDir_
+			                  - bend_ + modWheel_ + aftertouch_ * 0.9f);
 			whammy.tick ();
 
 			// ---- strings + pickups ---------------------------------------
@@ -683,6 +684,9 @@ private:
 		barSus_ = getParam (kBarSus);
 		barRel_ = getParam (kBarRel);
 		barDepth_ = getParam (kBarDepth);
+		barDir_ = getParam (kBarDir) > 0.5f ? -1.f : 1.f;   // Lift = negative (pull up)
+		barFlutter_ = getParam (kBarFlutter);
+		whammy.setParams (4.0f, 2.4f, barFlutter_, 0.0f, 0.0f);
 
 		amp.setParams (getParam (kDrive), (int) (getParam (kDriveChar) + 0.5f),
 		               getParam (kBass), getParam (kMid), getParam (kTreble),
@@ -747,6 +751,7 @@ private:
 	// The bar's envelope: dive on the attack, hold, and come back on release.
 	// It is drawn as an ADSR panel; these are the stage values in seconds.
 	float barAtk_ = 0.25f, barDec_ = 0.4f, barSus_ = 0.45f, barRel_ = 0.7f, barDepth_ = 0.f;
+	float barDir_ = 1.f, barFlutter_ = 0.3f;
 	float envLevel_ = 0.f;
 	int envStage_ = 0;          // 0 idle, 1 attack, 2 decay, 3 sustain, 4 release
 	int held_ = 0;

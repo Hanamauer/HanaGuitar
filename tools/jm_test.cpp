@@ -704,6 +704,38 @@ static void testBarEnvelope ()
 }
 
 
+
+// ---------------------------------------------------------------------------
+static void testBarLift ()
+{
+	std::printf ("\n[3h] bar lift -- the arm can pull the pitch up, not only dive\n");
+
+	auto run = [] (float dir) {
+		Rig rig;
+		rig.set (jm::kDrive, 0.f);
+		rig.set (jm::kCab, 0.f);
+		rig.set (jm::kChorus, 0.f);
+		rig.set (jm::kDelayMix, 0.f);
+		rig.set (jm::kRevMix, 0.f);
+		rig.set (jm::kBarDepth, 1.f);
+		rig.set (jm::kBarDir, dir);
+		rig.set (jm::kBarAtk, 0.05f);
+		rig.set (jm::kBarDec, 0.1f);
+		rig.set (jm::kBarSus, 1.f);
+		rig.set (jm::kBarRel, 0.3f);
+		rig.e.noteOn (64, 0.9f);
+		rig.render (24000);
+		return rig.e.barSemis ();
+	};
+
+	const float dive = run (0.f);
+	const float lift = run (1.f);
+	char buf[160];
+	std::snprintf (buf, sizeof (buf), "dive %.2f st, lift %+.2f st", dive, lift);
+	check ("dive drives the pitch down", dive < -2.5f, buf);
+	check ("lift pulls the pitch up", lift > 0.8f, buf);
+}
+
 // ---------------------------------------------------------------------------
 static void testLowMasking ()
 {
@@ -996,6 +1028,7 @@ int main (int argc, char** argv)
 	testPerformanceModes ();
 	testLegato ();
 	testBarEnvelope ();
+	testBarLift ();
 	testLowMasking ();
 	testSilence ();
 	testBlockSize ();

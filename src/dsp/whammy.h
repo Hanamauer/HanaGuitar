@@ -53,7 +53,7 @@ public:
 	}
 
 	// bar target: 0 = rest, 1 = full dive, negative = pull up
-	void setTarget (float t) { target = clampf (t, -0.35f, 1.f); }
+	void setTarget (float t) { target = clampf (t, -0.50f, 1.f); }
 	void addEnergy (float e) { flutterEnergy += e; }
 
 	inline void tick ()
@@ -77,9 +77,9 @@ public:
 			angle = 1.f;
 			if (vel > 0.f) vel *= -0.35f;
 		}
-		else if (angle < -0.35f)
+		else if (angle < -0.50f)
 		{
-			angle = -0.35f;
+			angle = -0.50f;
 			if (vel < 0.f) vel *= -0.35f;
 		}
 
