@@ -1,0 +1,14 @@
+﻿# build output
+build/
+*.o
+*.obj
+*.exe
+*.pdb
+debug.log
+
+# local toolchain
+.tools/
+
+# OS noise
+Thumbs.db
+desktop.ini
