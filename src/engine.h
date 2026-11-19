@@ -619,6 +619,11 @@ public:
 	float barSemis () const { return whammy.semitones (); }
 	float stringAge (int i) const { return str[i].age; }
 	float delayTimeMs () const { return delayMs; }
+	void setHostTempo (float bpm)
+	{
+		hostBpm_ = (bpm > 1.f && bpm < 400.f) ? bpm : 0.f;
+	}
+	float effectiveBpm () const { return hostBpm_ > 1.f ? hostBpm_ : bpm; }
 	int envStage () const { return envStage_; }
 	int heldCount () const { return held_; }
 	float envValue () const { return envLevel_; }
@@ -704,7 +709,8 @@ private:
 		bpm = getParam (kBpm);
 		delaySync = getParam (kDelaySync) > 0.5f;
 		delayDiv = std::min (3, std::max (0, (int) (getParam (kDelayDiv) + 0.5f)));
-		delayMs = delaySync ? (60000.f / std::max (20.f, bpm)) * kDivQuarters[delayDiv]
+		const float effBpm = hostBpm_ > 1.f ? hostBpm_ : bpm;
+		delayMs = delaySync ? (60000.f / std::max (20.f, effBpm)) * kDivQuarters[delayDiv]
 		                    : getParam (kDelayTime);
 		revSize = getParam (kRevSize);
 		revMix = getParam (kRevMix);
@@ -753,6 +759,7 @@ private:
 	float puHeight = 0.5f, age = 0.15f;
 	float chorusAmt = 0.1f, delayMs = 380.f, delayMix = 0.18f, delayFB = 0.35f;
 	float bpm = 120.f;
+	float hostBpm_ = 0.f;
 	bool delaySync = false;
 	int delayDiv = 1;
 	float revSize = 0.62f, revMix = 0.2f, width = 0.6f;

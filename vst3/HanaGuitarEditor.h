@@ -35,6 +35,10 @@ public:
 	// (the arm itself is not drawn; the artwork is the guitar).
 	virtual float barSemitones () = 0;
 
+	// The host's tempo from the VST3 process context, 0 when the host does not
+	// provide one (a stopped transport or a host that never fills it in).
+	virtual float hostTempo () { return 0.f; }
+
 	// bit 0 palm mute, bit 1 harmonics, bit 2 tap -- the keyswitch lamps.
 	virtual int techniqueMask () = 0;
 

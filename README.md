@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.9
+# HanaGuitar for indie 1.10
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -181,6 +181,9 @@ SPACE 下面新加了一行 **DELAY**：
 
 * **Delay Time**（左边旋钮）——自由模式下的毫秒数，20–2000 ms。
 * **BPM** —— 40–240；旁边 **TAP** 连点两下以上，取平均间隔算出 BPM。
+  **宿主给了速度就用宿主的**：VST3 的 ProcessContext.tempo 有效时（播放中、
+  宿主支持）自动接管，数字变青色、左边小点变亮；宿主没给（停止播放或 FL 的
+  某些 wrapper）才用面板/ TAP 的 BPM。
 * **SYNC** —— 打开后延迟时间由 BPM × 时值算出来，旋钮交给时值按钮：
   `1/4`、`1/8`、`1/8T`、`1/16`。公式是 `ms = 60000 / BPM × 时值（四分音符为 1）`，
   120 BPM 下分别是 500 / 250 / 166.7 / 125 ms。
@@ -314,7 +317,7 @@ build.bat
 
 ```
 build\jm_test.exe      68 passed, 0 failed
-build\host_test.exe    73 passed, 0 failed
+build\host_test.exe    74 passed, 0 failed
 ```
 
 覆盖内容：
@@ -374,6 +377,7 @@ build\host_test.exe    73 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.10 | **HanaGuitar for indie** | 宿主 BPM 自动同步：读 VST3 ProcessContext 的 tempo，优先于面板 BPM |
 | 1.9 | **HanaGuitar for indie** | DELAY 行：BPM / TAP / SYNC / 1/4·1/8·1/8T·1/16 时值同步；Delay FB、时间平滑、合唱高通 |
 | 1.8 | **HanaGuitar for indie** | 修掉默认的“滑音”：新音一律重新拨弦，legato 只在按住 D0 时；加 SAVE / USER 用户预设 |
 | 1.7 | **HanaGuitar for indie** | 摇把支持上拉：DIVE/LIFT 方向、+2 半音上行程、Flutter 旋钮 |

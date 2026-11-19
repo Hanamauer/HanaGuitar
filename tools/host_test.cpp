@@ -191,7 +191,7 @@ struct Rig
 	// Render nSamples in blocks <= maxBlock.  An instrument has no audio input,
 	// so numInputs is 0 -- a host that fed it one would be routing into nothing.
 	float render (int nSamples, std::vector<float>* mono, IEventList* events,
-	              bool* finite)
+	              bool* finite, double tempo = 0.0)
 	{
 		float peak = 0.f;
 		if (finite) *finite = true;
@@ -212,6 +212,14 @@ struct Rig
 			bo.channelBuffers32 = outs;
 			data.outputs = &bo;
 			data.inputEvents = events;
+
+			ProcessContext pc = {};
+			if (tempo > 0.0)
+			{
+				pc.state = ProcessContext::kTempoValid;
+				pc.tempo = tempo;
+				data.processContext = &pc;
+			}
 
 			if (proc->process (data) != kResultOk) { if (finite) *finite = false; break; }
 
@@ -727,6 +735,48 @@ int main (int argc, char** argv)
 		rig.render (512, nullptr, &ev, &finite);
 		ev.clear ();
 		rig.render (24000, nullptr, nullptr, &finite);
+	}
+
+	std::printf ("\n[host tempo]\n");
+	{
+		// The delay must follow the song tempo the host reports, not the BPM
+		// typed on the panel: at 90 BPM a 1/4 note is 666.7 ms.
+		driveParam (rig, jm::kChorus, 0.0);
+		driveParam (rig, jm::kRevMix, 0.0);
+		driveParam (rig, jm::kDrive, 0.0);
+		driveParam (rig, jm::kCab, 0.0);
+		driveParam (rig, jm::kSustain,
+		            (double) jm::normFromPlain (jm::kParamDefs[jm::kSustain], 0.05f));
+		driveParam (rig, jm::kDelayMix, 0.9);
+		driveParam (rig, jm::kDelayFB, 0.1);
+		driveParam (rig, jm::kDelaySync, 1.0);
+		driveParam (rig, jm::kDelayDiv,
+		            (double) jm::normFromPlain (jm::kParamDefs[jm::kDelayDiv], 0.0));
+		driveParam (rig, jm::kBpm,
+		            (double) jm::normFromPlain (jm::kParamDefs[jm::kBpm], 120.0));
+
+		std::vector<float> mono;
+		bool finite = true;
+		TestEventList ev;
+		ev.note (52, 0.9f, true);
+		rig.render (512, nullptr, &ev, &finite, 90.0);
+		mono.clear ();
+		rig.render (65536, &mono, nullptr, &finite, 90.0);
+
+		auto rmsAt = [&] (double seconds) {
+			const int a = (int) (seconds * 48000.0);
+			if (a + 960 >= (int) mono.size ()) return 0.0;
+			double acc = 0.0;
+			for (int i = 0; i < 960; ++i) acc += (double) mono[a + i] * mono[a + i];
+			return std::sqrt (acc / 960.0);
+		};
+
+		// the 1/4 echo lands at 666.7 ms, a 1/8 echo would be at 333 ms
+		const double atQuarter = rmsAt (0.67);
+		const double between = rmsAt (0.50);
+		std::snprintf (msg, sizeof (msg), "(echo rms @0.67s %.4f, @0.50s %.4f)",
+		               atQuarter, between);
+		check ("the delay follows the host tempo", atQuarter > between * 2.0, msg);
 	}
 
 	std::printf ("\n[whammy]\n");

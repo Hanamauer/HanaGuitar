@@ -26,6 +26,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
+#include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/gui/iplugview.h"
@@ -253,6 +254,7 @@ public:
 	}
 
 	void copyScope (float* dst, int n) SMTG_OVERRIDE { engine_.copyScope (dst, n); }
+	float hostTempo () SMTG_OVERRIDE { return hostTempo_; }
 	float takePeak () SMTG_OVERRIDE { return engine_.takePeak (); }
 	double sampleRate () SMTG_OVERRIDE { return hostRate_ > 1.0 ? hostRate_ : 48000.0; }
 	float barSemitones () SMTG_OVERRIDE { return engine_.barSemis (); }
@@ -327,6 +329,17 @@ public:
 				}
 			}
 		}
+		// 1b. tempo.  The ProcessContext carries the song tempo; when it is
+		// valid it overrides the panel's BPM, which is what makes a synced
+		// delay follow the DAW instead of a number typed by hand.
+		if (data.processContext &&
+		    (data.processContext->state & Vst::ProcessContext::kTempoValid) &&
+		    data.processContext->tempo > 1.0)
+			hostTempo_ = (float) data.processContext->tempo;
+		else
+			hostTempo_ = 0.f;
+		engine_.setHostTempo (hostTempo_);
+
 		applyParams ();
 
 		// 2. notes.
@@ -529,6 +542,7 @@ private:
 	}
 
 	jm::Engine engine_;
+	float hostTempo_ = 0.f;
 
 	// The plugin owns the Parameter objects so the editor can ask a single
 	// object for both the normalised value and the plain-unit string.

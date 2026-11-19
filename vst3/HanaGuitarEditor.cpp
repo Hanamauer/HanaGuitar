@@ -1137,9 +1137,14 @@ void HanaGuitarEditor::drawDelayBlock (GpGraphics* g)
 		? (60000.f / std::max (20.f, bpm)) * kDivQuarters[div]
 		: plainFromNorm (kParamDefs[kDelayTime], (float) valueOf (kDelayTime));
 
+	const float hostBpm = sink_ ? sink_->hostTempo () : 0.f;
+	const bool useHost = hostBpm > 1.f;
+	const float shownBpm = useHost ? hostBpm : bpm;
+
 	char buf[64];
-	std::snprintf (buf, sizeof (buf), "%.1f BPM", bpm);
-	txt (g, brInk_, fLabel_, buf, b.x + 8, b.y + 2, 112, 18);
+	std::snprintf (buf, sizeof (buf), "%.1f BPM", shownBpm);
+	ellipse (g, useHost ? brAccent_ : brLine_, b.x + 8, b.y + 9, 6, 6);
+	txt (g, useHost ? brAccent_ : brInk_, fLabel_, buf, b.x + 20, b.y + 2, 104, 18);
 
 	fillRound (g, brPanel_, tapRect_.x, tapRect_.y, tapRect_.w, tapRect_.h, 4);
 	txt (g, brAccent_, fTiny_, "TAP", tapRect_.x, tapRect_.y + 4, tapRect_.w, 14, 1);
@@ -1283,7 +1288,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.9", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.10", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
