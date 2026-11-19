@@ -772,6 +772,49 @@ static void testNoGlideByDefault ()
 	rig.e.keyswitch (jm::kKsTap, false);
 }
 
+
+// ---------------------------------------------------------------------------
+static void testDelaySync ()
+{
+	std::printf ("\n[3j] delay sync -- BPM and note value decide the delay time\n");
+
+	Rig rig;
+	rig.set (jm::kChorus, 0.f);
+	rig.set (jm::kRevMix, 0.f);
+	rig.set (jm::kDelayMix, 0.f);
+	rig.set (jm::kDelaySync, 1.f);
+	rig.set (jm::kBpm, 120.f);
+
+	rig.render (256);   // let updateFromParams run
+
+	struct Case { int div; float ms; const char* name; };
+	const Case cases[4] = { { 0, 500.f, "1/4" }, { 1, 250.f, "1/8" },
+	                        { 2, 166.7f, "1/8T" }, { 3, 125.f, "1/16" } };
+	for (const Case& c : cases)
+	{
+		rig.set (jm::kDelayDiv, (float) c.div);
+		rig.render (256);
+		const float ms = rig.e.delayTimeMs ();
+		char buf[160];
+		std::snprintf (buf, sizeof (buf), "%s at 120 BPM -> %.1f ms (want %.1f)", c.name, ms, c.ms);
+		check ("synced delay matches the note value", std::fabs (ms - c.ms) < 1.0f, buf);
+	}
+
+	rig.set (jm::kBpm, 60.f);
+	rig.set (jm::kDelayDiv, 0.f);
+	rig.render (256);
+	char buf[160];
+	std::snprintf (buf, sizeof (buf), "1/4 at 60 BPM -> %.1f ms", rig.e.delayTimeMs ());
+	check ("sync follows the BPM", std::fabs (rig.e.delayTimeMs () - 1000.f) < 2.f, buf);
+
+	// free mode goes back to the knob
+	rig.set (jm::kDelaySync, 0.f);
+	rig.set (jm::kDelayTime, 380.f);
+	rig.render (256);
+	std::snprintf (buf, sizeof (buf), "free -> %.1f ms", rig.e.delayTimeMs ());
+	check ("free mode uses the delay time knob", std::fabs (rig.e.delayTimeMs () - 380.f) < 2.f, buf);
+}
+
 // ---------------------------------------------------------------------------
 static void testLowMasking ()
 {
@@ -1066,6 +1109,7 @@ int main (int argc, char** argv)
 	testBarEnvelope ();
 	testBarLift ();
 	testNoGlideByDefault ();
+	testDelaySync ();
 	testLowMasking ();
 	testSilence ();
 	testBlockSize ();

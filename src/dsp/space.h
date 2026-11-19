@@ -22,9 +22,11 @@ public:
 		dl.clear ();
 		phase = 0.f;
 		phase2 = 0.31f;
-		lpL.reset (); lpR.reset ();
+		lpL.reset (); lpR.reset (); hpL.reset (); hpR.reset ();
 		lpL.setLowpass (6000.f, 0.7f, fs);
 		lpR.setLowpass (6000.f, 0.7f, fs);
+		hpL.setHighpass (140.f, 0.7f, fs);
+		hpR.setHighpass (140.f, 0.7f, fs);
 	}
 
 	void reset ()
@@ -32,7 +34,7 @@ public:
 		dl.clear ();
 		phase = 0.f;
 		phase2 = 0.31f;
-		lpL.reset (); lpR.reset ();
+		lpL.reset (); lpR.reset (); hpL.reset (); hpR.reset ();
 	}
 
 	// amount 0..1.  Rate and depth are fixed to the "always on, barely there"
@@ -60,8 +62,8 @@ public:
 		dl.write (0.5f * (l + r));
 
 		// the wet path is darker than the dry one, like a bucket brigade
-		const float wetL = lpL.process (wl);
-		const float wetR = lpR.process (wr);
+		const float wetL = hpL.process (lpL.process (wl));
+		const float wetR = hpR.process (lpR.process (wr));
 
 		const float a = clampf (amount, 0.f, 1.f) * 0.62f;
 		l += wetL * a;
@@ -70,7 +72,7 @@ public:
 
 private:
 	DelayLine dl;
-	Biquad lpL, lpR;
+	Biquad lpL, lpR, hpL, hpR;
 	float phase = 0.f, phase2 = 0.31f;
 	float fs = 48000.f;
 };
@@ -104,11 +106,18 @@ public:
 
 	// Panic: drop the repeats.  A delay that keeps echoing after all-notes-off
 	// is a stuck note with a longer memory.
-	void clearTail () { dlL.clear (); dlR.clear (); }
+	void clearTail () { dlL.clear (); dlR.clear (); dSmooth = 0.f; }
 
-	inline void process (float& l, float& r, float timeMs, float mix)
+	inline void process (float& l, float& r, float timeMs, float mix, float feedback = 0.52f)
 	{
-		const float d = clampf (timeMs, 20.f, 2000.f) * 0.001f * fs;
+		// The read distance follows its target with a one-pole: changing the
+		// tempo (or the division) bends the repeats like tape instead of
+		// clicking, and a synced delay stays glued to the bar.
+		const float dTarget = clampf (timeMs, 20.f, 2000.f) * 0.001f * fs;
+		if (!(dSmooth > 4.f)) dSmooth = dTarget;
+		dSmooth += (dTarget - dSmooth) * 0.0012f;
+		const float d = dSmooth;
+		const float fbAmt = clampf (feedback, 0.f, 0.95f);
 
 		// Cross feedback: the left repeat goes into the right delay line.  On a
 		// wide stereo patch this is what stops the repeats from stacking in the
@@ -125,8 +134,8 @@ public:
 		if (phase >= 1.f) phase -= 1.f;
 		const float drift = 1.f + 0.035f * std::sin (kTwoPi * phase);
 
-		dlL.write (0.5f * (l + r) + fbR * 0.52f * drift);
-		dlR.write (0.5f * (l + r) + fbL * 0.52f * drift);
+		dlL.write (0.5f * (l + r) + fbR * fbAmt * drift);
+		dlR.write (0.5f * (l + r) + fbL * fbAmt * drift);
 
 		const float m = clampf (mix, 0.f, 1.f);
 		l += tapL * m;
@@ -136,6 +145,7 @@ public:
 private:
 	DelayLine dlL, dlR;
 	Biquad lpL, lpR, hpL, hpR;
+	float dSmooth = 0.f;
 	float phase = 0.f;
 	float fs = 48000.f;
 };

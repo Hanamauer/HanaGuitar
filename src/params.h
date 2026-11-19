@@ -45,11 +45,15 @@ enum P : ParamID
 	kCab,
 	// --- column 5: SPACE
 	kChorus,
-	kDelayTime,
+	kDelayFB,
 	kDelayMix,
 	kRevSize,
 	kRevMix,
 	kWidth,
+	kDelayTime,
+	kBpm,
+	kDelaySync,
+	kDelayDiv,
 	// --- column 6: MASTER
 	kTremRate,
 	kTremDepth,
@@ -95,6 +99,11 @@ static const char* kPickupItems[] = { "P90", "Both", "HB" };
 static const char* kDriveItems[] = { "Clean", "Overdrive", "Fuzz", "Muff" };
 static const char* kCircuitItems[] = { "Lead", "Rhythm" };
 static const char* kBarDirItems[] = { "Dive", "Lift" };
+static const char* kSyncItems[] = { "Free", "Sync" };
+static const char* kDivItems[] = { "1/4", "1/8", "1/8T", "1/16" };
+
+// note value of each division, in quarter notes
+static constexpr float kDivQuarters[4] = { 1.f, 0.5f, 1.f / 3.f, 0.25f };
 static const char* kTuningItems[] = { "Standard", "Drop D", "Eb Standard", "DADGAD",
                                       "Open E", "FACGCE", "DAEAC#E" };
 static const char* kRevItems[] = { "Room", "Hall", "Plate", "Gate", "Reverse" };
@@ -129,11 +138,15 @@ static const ParamDef kParamDefs[] = {
 	{ kCab,          "Cabinet",     "AMP",     "",   0.f, 1.f,  0.70f, 0, nullptr, 0 },
 	// SPACE
 	{ kChorus,       "Chorus",      "SPACE",   "",   0.f, 1.f,  0.10f, 0, nullptr, 0 },
-	{ kDelayTime,    "Delay Time",  "SPACE",   "ms", 20.f, 1200.f, 380.f, 0, nullptr, 0 },
+	{ kDelayFB,      "Delay FB",    "SPACE",   "",   0.f, 0.95f, 0.35f, 0, nullptr, 0 },
 	{ kDelayMix,     "Delay Mix",   "SPACE",   "",   0.f, 1.f,  0.18f, 0, nullptr, 0 },
 	{ kRevSize,      "Reverb Size", "SPACE",   "",   0.f, 1.f,  0.62f, 0, nullptr, 0 },
 	{ kRevMix,       "Reverb Mix",  "SPACE",   "",   0.f, 1.f,  0.20f, 0, nullptr, 0 },
 	{ kWidth,        "Width",       "SPACE",   "",   0.f, 1.f,  0.60f, 0, nullptr, 0 },
+	{ kDelayTime,    "Delay Time",  "DELAY",   "ms", 20.f, 2000.f, 380.f, 0, nullptr, 0 },
+	{ kBpm,          "BPM",         "DELAY",   "",   40.f, 240.f, 120.f, 0, nullptr, 0 },
+	{ kDelaySync,    "Sync",        "DELAY",   "",   0.f, 1.f,  0.f,   1, kSyncItems, 2 },
+	{ kDelayDiv,     "Division",    "DELAY",   "",   0.f, 3.f,  1.f,   3, kDivItems, 4 },
 	// MASTER
 	{ kTremRate,     "Trem Rate",   "MASTER",  "Hz", 0.2f, 12.f, 3.50f, 0, nullptr, 0 },
 	{ kTremDepth,    "Trem Depth",  "MASTER",  "",   0.f, 1.f,  0.00f, 0, nullptr, 0 },

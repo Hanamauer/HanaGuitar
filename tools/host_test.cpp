@@ -1043,6 +1043,31 @@ int main (int argc, char** argv)
 					check ("USER restores the saved preset", std::fabs (restored - want) < 0.01, msg);
 				}
 
+				// Tap tempo + note value: the delay follows the song.
+				{
+					const int tx = 852, ty = 422;
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (tx, ty));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (tx, ty));
+					Sleep (500);
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (tx, ty));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (tx, ty));
+					const double bpm = jm::plainFromNorm (jm::kParamDefs[jm::kBpm], rig.getParam (jm::kBpm));
+					std::snprintf (msg, sizeof (msg), "(tap -> %.1f BPM)", bpm);
+					check ("tap tempo sets the BPM", std::fabs (bpm - 120.0) < 12.0, msg);
+
+					const int dx = 881, dy = 445;   // 1/8T
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (dx, dy));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (dx, dy));
+					const double div = rig.getParam (jm::kDelayDiv);
+					std::snprintf (msg, sizeof (msg), "(div %.2f)", div);
+					check ("division button sets the note value", std::fabs (div - 2.0 / 3.0) < 0.05, msg);
+
+					const int sx2 = 912, sy2 = 422;
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (sx2, sy2));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (sx2, sy2));
+					check ("sync button turns tempo sync on", rig.getParam (jm::kDelaySync) > 0.5);
+				}
+
 				// The circuit switch: clicking RHYTHM must move the parameter
 				// (there is no arm to drag any more -- the bar is CC-driven).
 				{

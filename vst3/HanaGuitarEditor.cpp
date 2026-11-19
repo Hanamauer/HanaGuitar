@@ -73,7 +73,7 @@ const int kX0 = 528;              // controls start here
 const int kRight = 1104;          // controls end here
 const int kKnobX = 618;           // knob area starts here (labels to the left)
 const int kRowY0 = 104;
-const int kRowH = 68;
+const int kRowH = 60;
 const int kPresetY = 68;
 const int kPresetH = 30;
 const int kLegendY = 592;
@@ -128,17 +128,18 @@ struct RowDef
 	int extra;       // row 2 starts with the circuit switch
 };
 
-const RowDef kRows[7] = {
+const RowDef kRows[8] = {
 	{ "STRING",  kSustain,    3, 0 },
 	{ "PICKUP",  kPickupSel,  5, 0 },
 	{ "CIRCUIT", kVolume,     3, 1 },   // the switch comes first
 	{ "AMP",     kDrive,      7, 0 },
 	{ "SPACE",   kChorus,     6, 0 },
+	{ "DELAY",   kDelayTime,  1, 3 },   // knob + tempo/tap block
 	{ "MASTER",  kTremRate,   6, 0 },
 	{ "WHAMMY",  kBarAtk,     0, 2 },   // the ADSR panel, not knobs
 };
 
-const int kNumRows = 7;
+const int kNumRows = 8;
 
 // ---------------------------------------------------------------------------
 // IPlugView has no message channel.  The editor registers its window against
@@ -318,6 +319,8 @@ private:
 	void drawKnob (GpGraphics* g, const Knob& k);
 	void drawCircuitSwitch (GpGraphics* g);
 	void drawBarEnv (GpGraphics* g);
+	void drawDelayBlock (GpGraphics* g);
+	void tapTempo ();
 	int envHandleAt (int x, int y) const;
 	void envDragTo (int handle, int x, int y);
 	void drawLegend (GpGraphics* g);
@@ -369,6 +372,10 @@ private:
 	RectI barRect_;
 	RectI envRect_;
 	RectI barDirRect_;
+	RectI delayBlock_, tapRect_, syncRect_, divRect_[4];
+	unsigned long long tapLast_ = 0;
+	double tapAvg_ = 0.0;
+	int tapCount_ = 0;
 	int envDrag_ = -1;
 
 	int dragId_ = -1;
@@ -461,8 +468,16 @@ void HanaGuitarEditor::buildLayout ()
 	barRect_ = { kRight - 152, 4, 152, 30 };
 	{
 		const int wy = kRowY0 + (kNumRows - 1) * kRowH;
-		barDirRect_ = { kKnobX + 4, wy + 20, 80, 26 };
-		envRect_ = { kKnobX + 94, wy + 5, kRight - (kKnobX + 94), kRowH - 10 };
+		barDirRect_ = { kKnobX + 4, wy + 16, 78, 26 };
+		envRect_ = { kKnobX + 92, wy + 4, kRight - (kKnobX + 92), kRowH - 8 };
+	}
+	{
+		const int dy = kRowY0 + 5 * kRowH;
+		delayBlock_ = { kKnobX + 90, dy + 4, kRight - (kKnobX + 90), kRowH - 8 };
+		tapRect_ = { delayBlock_.x + 118, delayBlock_.y + 3, 52, 22 };
+		syncRect_ = { delayBlock_.x + 176, delayBlock_.y + 3, 56, 22 };
+		for (int i = 0; i < 4; ++i)
+			divRect_[i] = { delayBlock_.x + 6 + i * 68, delayBlock_.y + 27, 62, 20 };
 	}
 
 	for (int i = 0; i < 6; ++i)
@@ -968,14 +983,15 @@ void HanaGuitarEditor::drawKnobs (GpGraphics* g)
 	}
 	drawCircuitSwitch (g);
 	drawBarEnv (g);
+	drawDelayBlock (g);
 	for (int i = 0; i < knobCount_; ++i) drawKnob (g, knobs[i]);
 }
 
 void HanaGuitarEditor::drawKnob (GpGraphics* g, const Knob& k)
 {
 	const float cx = k.r.cx ();
-	const float cy = k.r.y + 34.f;
-	const float rad = 18.f;
+	const float cy = k.r.y + 30.f;
+	const float rad = 15.f;
 
 	char label[64];
 	std::snprintf (label, sizeof (label), "%s", kParamDefs[k.id].name);
@@ -1005,7 +1021,7 @@ void HanaGuitarEditor::drawKnob (GpGraphics* g, const Knob& k)
 	// value
 	char val[48];
 	formatValue (k.id, v, val, sizeof (val));
-	txt (g, brInk_, fValue_, val, k.r.x, k.r.y + 52, k.r.w, 14, 1);
+	txt (g, brInk_, fValue_, val, k.r.x, k.r.y + 46, k.r.w, 12, 1);
 }
 
 void HanaGuitarEditor::drawCircuitSwitch (GpGraphics* g)
@@ -1103,6 +1119,75 @@ void HanaGuitarEditor::drawBarEnv (GpGraphics* g)
 		txt (g, brDim_, fTiny_, "drag the peak up to enable", r.x + 6, r.y + (r.h / 2) - 6, r.w - 12, 12, 1);
 }
 
+// ---------------------------------------------------------------------------
+// The delay's tempo block: BPM, a tap button, sync on/off and the note value.
+// Synced, the delay time is derived (quarter = 60000/BPM ms); free, the Delay
+// Time knob next to it is in charge.
+// ---------------------------------------------------------------------------
+void HanaGuitarEditor::drawDelayBlock (GpGraphics* g)
+{
+	const RectI& b = delayBlock_;
+	fillRound (g, brPanelHi_, b.x, b.y, b.w, b.h, 5);
+
+	const float bpm = plainFromNorm (kParamDefs[kBpm], (float) valueOf (kBpm));
+	const bool sync = plainFromNorm (kParamDefs[kDelaySync], (float) valueOf (kDelaySync)) > 0.5f;
+	const int div = std::min (3, std::max (0, (int) (plainFromNorm (kParamDefs[kDelayDiv],
+	                                                             (float) valueOf (kDelayDiv)) + 0.5f)));
+	const float ms = sync
+		? (60000.f / std::max (20.f, bpm)) * kDivQuarters[div]
+		: plainFromNorm (kParamDefs[kDelayTime], (float) valueOf (kDelayTime));
+
+	char buf[64];
+	std::snprintf (buf, sizeof (buf), "%.1f BPM", bpm);
+	txt (g, brInk_, fLabel_, buf, b.x + 8, b.y + 2, 112, 18);
+
+	fillRound (g, brPanel_, tapRect_.x, tapRect_.y, tapRect_.w, tapRect_.h, 4);
+	txt (g, brAccent_, fTiny_, "TAP", tapRect_.x, tapRect_.y + 4, tapRect_.w, 14, 1);
+
+	fillRound (g, sync ? brAccent2_ : brPanel_, syncRect_.x, syncRect_.y,
+	           syncRect_.w, syncRect_.h, 4);
+	txt (g, sync ? brInk_ : brDim_, fTiny_, "SYNC", syncRect_.x, syncRect_.y + 4,
+	     syncRect_.w, 14, 1);
+
+	for (int i = 0; i < 4; ++i)
+	{
+		const bool sel = (div == i);
+		GpSolidFill* fb = sel ? (sync ? brAccent_ : brLine_) : brPanel_;
+		fillRound (g, fb, divRect_[i].x, divRect_[i].y, divRect_[i].w, divRect_[i].h, 4);
+		txt (g, sel ? brBg_ : brDim_, fTiny_, kDivItems[i], divRect_[i].x,
+		     divRect_[i].y + 3, divRect_[i].w, 14, 1);
+	}
+
+	std::snprintf (buf, sizeof (buf), "%.0f ms", ms);
+	txt (g, brDim_, fTiny_, buf, b.x + b.w - 78, b.y + 29, 72, 14, 1);
+}
+
+void HanaGuitarEditor::tapTempo ()
+{
+	const unsigned long long now = GetTickCount64 ();
+	const unsigned long long gap = tapLast_ ? now - tapLast_ : 0;
+
+	if (tapLast_ && gap > 150ull && gap < 2000ull)
+	{
+		tapAvg_ = (tapAvg_ > 0.0) ? tapAvg_ * 0.7 + (double) gap * 0.3 : (double) gap;
+		++tapCount_;
+		if (tapCount_ >= 2)
+		{
+			double bpm = 60000.0 / std::max (1.0, tapAvg_);
+			bpm = std::min (240.0, std::max (40.0, bpm));
+			setValue (kBpm, (double) normFromPlain (kParamDefs[kBpm], (float) bpm), true);
+		}
+	}
+	else
+	{
+		tapAvg_ = 0.0;
+		tapCount_ = 0;
+	}
+
+	tapLast_ = now;
+	InvalidateRect (hwnd_, nullptr, FALSE);
+}
+
 int HanaGuitarEditor::envHandleAt (int x, int y) const
 {
 	const float A = plainFromNorm (kParamDefs[kBarAtk], (float) valueOf (kBarAtk));
@@ -1198,7 +1283,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.8", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.9", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1508,6 +1593,26 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 		if (presetBtn_[5].has (dx, dy)) { saveUserPreset (); return 0; }
 
 		if (circuitSwitch_.has (dx, dy)) { toggleCircuit (); return 0; }
+
+		if (tapRect_.has (dx, dy)) { tapTempo (); return 0; }
+
+		if (syncRect_.has (dx, dy))
+		{
+			const double cur = valueOf (kDelaySync);
+			sink_->onBeginEdit (kDelaySync);
+			sink_->onPerformEdit (kDelaySync, cur > 0.5 ? 0.0 : 1.0);
+			sink_->onEndEdit (kDelaySync);
+			InvalidateRect (h, nullptr, FALSE);
+			return 0;
+		}
+
+		for (int i = 0; i < 4; ++i)
+			if (divRect_[i].has (dx, dy))
+			{
+				setValue (kDelayDiv, (double) i / 3.0, true);
+				InvalidateRect (h, nullptr, FALSE);
+				return 0;
+			}
 
 		if (barDirRect_.has (dx, dy))
 		{

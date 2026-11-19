@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.8
+# HanaGuitar for indie 1.9
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -175,6 +175,19 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 
 ---
 
+## 7b. 延迟与节拍同步
+
+SPACE 下面新加了一行 **DELAY**：
+
+* **Delay Time**（左边旋钮）——自由模式下的毫秒数，20–2000 ms。
+* **BPM** —— 40–240；旁边 **TAP** 连点两下以上，取平均间隔算出 BPM。
+* **SYNC** —— 打开后延迟时间由 BPM × 时值算出来，旋钮交给时值按钮：
+  `1/4`、`1/8`、`1/8T`、`1/16`。公式是 `ms = 60000 / BPM × 时值（四分音符为 1）`，
+  120 BPM 下分别是 500 / 250 / 166.7 / 125 ms。
+* **Delay FB**（SPACE 行）—— 反馈量 0–0.95，回路里带 3.8 kHz 低通与 180 Hz 高通，
+  交叉反馈让回声左右分开。
+* 改 BPM 或时值时，读取距离用一阶平滑跟过去，听起来像磁带变调而不是咔哒。
+
 ## 8. MIDI 行为
 
 | 输入 | 作用 |
@@ -192,51 +205,54 @@ Find more plugins。REAPER：Preferences → VST → 添加路径 → Re-scan。
 
 ---
 
-## 9. 参数（32 个旋钮 + Preset + Bar）
+## 9. 参数表
 
-| id | 名称 | 范围 | 默认 |
+
+| # | 参数 | 范围 | 默认 |
 |---|---|---|---|
-| 0 | Sustain | 0–1（T60 0.5–20 s） | 0.65 |
+| 0 | Sustain | 0–1 | 0.65 |
 | 1 | Brightness | 0–1 | 0.66 |
 | 2 | Sympathy | 0–1 | 0.25 |
 | 3 | Pickup | P90 / Both / HB | Both |
-| 4 | Height | 0–1 | 0.50 |
+| 4 | Height | 0–1 | 0.5 |
 | 5 | String Age | 0–1 | 0.15 |
 | 6 | Body | 0–1 | 0.68 |
-| 7 | B.T.B. | 0–1 | 0.30 |
+| 7 | B.T.B. | 0–1 | 0.3 |
 | 8 | Circuit | Lead / Rhythm | Lead |
-| 9 | Volume | 0–1 | 1.00 |
-| 10 | Tone | 0–1 | 0.60 |
+| 9 | Volume | 0–1 | 1 |
+| 10 | Tone | 0–1 | 0.6 |
 | 11 | Rhythm Tone | 0–1 | 0.55 |
 | 12 | Drive | 0–1 | 0.08 |
-| 13 | Character | Clean/OD/Fuzz/Muff | Clean |
-| 14–16 | Bass / Mid / Treble | −12…+12 dB | 0 |
-| 17 | Presence | 0–1 | 0.40 |
-| 18 | Cabinet | 0–1 | 0.70 |
-| 19 | Chorus | 0–1 | 0.10 |
-| 20 | Delay Time | 20–1200 ms | 380 |
+| 13 | Character | Clean / Overdrive / Fuzz / Muff | Clean |
+| 14 | Bass | -12–12 dB | 0 |
+| 15 | Mid | -12–12 dB | 0 |
+| 16 | Treble | -12–12 dB | 0 |
+| 17 | Presence | 0–1 | 0.4 |
+| 18 | Cabinet | 0–1 | 0.7 |
+| 19 | Chorus | 0–1 | 0.1 |
+| 20 | Delay FB | 0–0.95 | 0.35 |
 | 21 | Delay Mix | 0–1 | 0.18 |
 | 22 | Reverb Size | 0–1 | 0.62 |
-| 23 | Reverb Mix | 0–1 | 0.20 |
-| 24 | Width | 0–1 | 0.60 |
-| 25 | Trem Rate | 0.2–12 Hz | 3.5 |
-| 26 | Trem Depth | 0–1 | 0 |
-| 27 | Flutter | 0–1 | 0.30 |
-| 28 | Tuning | Standard / Drop D / Eb / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
-| 29 | Reverb Mode | Room/Hall/Plate/Gate/Reverse | Hall |
-| 30 | Output | −30…+12 dB | −4 |
-| 31 | Bar Attack | 0.005–3 s | 0.25 |
-| 32 | Bar Decay | 0.005–3 s | 0.40 |
-| 33 | Bar Sustain | 0–1 | 0.45 |
-| 34 | Bar Release | 0.005–4 s | 0.70 |
-| 35 | Bar Depth | 0–1 | 0 |
-| 36 | Bar Dir | Dive / Lift | Dive |
-| — | Preset | 4 个 | Clean JM |
-| — | Bar | 0–1（自动化） | 0 |
-
-调弦（绝对音高，低→高）：Standard `E A D G B E`、Drop D `D A D G B E`、
-Eb `Eb Ab Db Gb Bb Eb`、DADGAD `D A D G A D`、Open E `E B E G# B E`、
-FACGCE `F A C G C E`、DAEAC#E `D A E A C# E`。
+| 23 | Reverb Mix | 0–1 | 0.2 |
+| 24 | Width | 0–1 | 0.6 |
+| 25 | Delay Time | 20–2000 ms | 380 |
+| 26 | BPM | 40–240 | 120 |
+| 27 | Sync | Free / Sync | Free |
+| 28 | Division | 1/4 / 1/8 / 1/8T / 1/16 | 1/8 |
+| 29 | Trem Rate | 0.2–12 Hz | 3.5 |
+| 30 | Trem Depth | 0–1 | 0 |
+| 31 | Flutter | 0–1 | 0.3 |
+| 32 | Tuning | Standard / Drop D / Eb Standard / DADGAD / Open E / FACGCE / DAEAC#E | Standard |
+| 33 | Reverb Mode | Room / Hall / Plate / Gate / Reverse | Hall |
+| 34 | Output | -30–12 dB | -4 |
+| 35 | Bar Attack | 0.005–3 s | 0.25 |
+| 36 | Bar Decay | 0.005–3 s | 0.4 |
+| 37 | Bar Sustain | 0–1 | 0.45 |
+| 38 | Bar Release | 0.005–4 s | 0.7 |
+| 39 | Bar Depth | 0–1 | 0 |
+| 40 | Bar Dir | Dive / Lift | Dive |
+| 41 | Preset | Shoegaze / Midwest Emo / Glide Lead / Clean JM / User | Clean JM |
+| 42 | Bar | 0–1 | 0 |
 
 ---
 
@@ -298,7 +314,7 @@ build.bat
 
 ```
 build\jm_test.exe      68 passed, 0 failed
-build\host_test.exe    70 passed, 0 failed
+build\host_test.exe    73 passed, 0 failed
 ```
 
 覆盖内容：
@@ -358,6 +374,7 @@ build\host_test.exe    70 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.9 | **HanaGuitar for indie** | DELAY 行：BPM / TAP / SYNC / 1/4·1/8·1/8T·1/16 时值同步；Delay FB、时间平滑、合唱高通 |
 | 1.8 | **HanaGuitar for indie** | 修掉默认的“滑音”：新音一律重新拨弦，legato 只在按住 D0 时；加 SAVE / USER 用户预设 |
 | 1.7 | **HanaGuitar for indie** | 摇把支持上拉：DIVE/LIFT 方向、+2 半音上行程、Flutter 旋钮 |
 | 1.6 | **HanaGuitar for indie** | reload 黑屏修复：窗口类注册到插件 DLL（不再是宿主 EXE），GDI+ 不再随视图销毁 |

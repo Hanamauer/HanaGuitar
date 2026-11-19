@@ -567,7 +567,7 @@ public:
 			}
 			amp.process (l, r);
 			chorus.process (l, r, chorusAmt);
-			delay.process (l, r, delayMs, delayMix);
+			delay.process (l, r, delayMs, delayMix, delayFB);
 			reverb.process (l, r, revSize, revMix);
 
 			const float mid = 0.5f * (l + r);
@@ -618,6 +618,7 @@ public:
 
 	float barSemis () const { return whammy.semitones (); }
 	float stringAge (int i) const { return str[i].age; }
+	float delayTimeMs () const { return delayMs; }
 	int envStage () const { return envStage_; }
 	int heldCount () const { return held_; }
 	float envValue () const { return envLevel_; }
@@ -698,8 +699,13 @@ private:
 		               getParam (kPresence), getParam (kCab));
 
 		chorusAmt = getParam (kChorus);
-		delayMs = getParam (kDelayTime);
 		delayMix = getParam (kDelayMix);
+		delayFB = getParam (kDelayFB);
+		bpm = getParam (kBpm);
+		delaySync = getParam (kDelaySync) > 0.5f;
+		delayDiv = std::min (3, std::max (0, (int) (getParam (kDelayDiv) + 0.5f)));
+		delayMs = delaySync ? (60000.f / std::max (20.f, bpm)) * kDivQuarters[delayDiv]
+		                    : getParam (kDelayTime);
 		revSize = getParam (kRevSize);
 		revMix = getParam (kRevMix);
 		width = getParam (kWidth);
@@ -745,7 +751,10 @@ private:
 	int   pickupSel = 1;
 	bool  circuitRhythm = false;
 	float puHeight = 0.5f, age = 0.15f;
-	float chorusAmt = 0.1f, delayMs = 380.f, delayMix = 0.18f;
+	float chorusAmt = 0.1f, delayMs = 380.f, delayMix = 0.18f, delayFB = 0.35f;
+	float bpm = 120.f;
+	bool delaySync = false;
+	int delayDiv = 1;
 	float revSize = 0.62f, revMix = 0.2f, width = 0.6f;
 	float tremRate = 3.5f, tremDepth = 0.f, outGain = 0.63f;
 	float sympathy = 0.25f;
