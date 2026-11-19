@@ -1,4 +1,4 @@
-# HanaGuitar for indie 1.7
+# HanaGuitar for indie 1.8
 
 物理建模的 offset 电吉他音源（VST3）。六根波导弦、P90 琴颈 + 双线圈琴桥、
 Jazzmaster 的 lead / rhythm 两套电路；摇把由 CC / 自动化 / 内置 LFO 驱动；
@@ -244,12 +244,25 @@ FACGCE `F A C G C E`、DAEAC#E `D A E A C# E`。
 
 | 预设 | 用途 |
 |---|---|
-| SHOEGAZE | fuzz + 大空间 + 慢摇把 LFO，和弦按着让摇把慢慢沉 |
+| SHOEGAZE | fuzz + 大混响，墙一样的吉他 |
 | MIDWEST EMO | clean 偏亮、短衰减，适合点弦/分解 |
-| GLIDE LEAD | 琴颈 P90 + 深 glide，摇把当乐器 |
-| CLEAN JM | 参考音色（也是插件默认值） |
+| GLIDE LEAD | 琴颈 P90 + 慢 glide，摇把当主角 |
+| CLEAN JM | 参考音色，也是插件的默认值 |
+| USER | 你自己存的那一个 |
 
-预设表在 `src\presets.h`，面板和离线渲染共用，避免“面板好听、导出不一样”。
+出厂预设在 `src\presets.h`；改完重新构建即可。
+
+### 自己存预设
+
+预设行右侧加了 **SAVE**，左边多了 **USER** 槽：
+
+* 调好音色点 **SAVE** —— 当前全部参数写到
+  `%APPDATA%\HanaGuitar\user.hnp`（纯文本，每行 `参数号 归一化值`），
+  按钮会闪一下 `SAVED`，同时自动切到 **USER** 槽。
+* 点 **USER** 读回来；插件重开、DAW 重开都在。
+* 宿主自己的预设（FL 的 .fst、VST3 program）也照旧可用：`getState/setState`
+  会把全部参数写进工程文件，两个通道互补。
+* 自动化测试用环境变量 `HANAGUITAR_PRESET_DIR` 把文件指到临时目录。
 
 ---
 
@@ -285,7 +298,7 @@ build.bat
 
 ```
 build\jm_test.exe      68 passed, 0 failed
-build\host_test.exe    67 passed, 0 failed
+build\host_test.exe    70 passed, 0 failed
 ```
 
 覆盖内容：
@@ -334,7 +347,7 @@ build\host_test.exe    67 passed, 0 failed
   只有 B.T.B. 共振。
 * 反向混响是实时近似（起音后先涨后切），不是带前瞻的真反向。
 * 面板只有 Windows（GDI+）；DSP 与 VST3 外壳是平台无关 C++。
-* 一个 MIDI 音符 = 一根弦，同弦重叠音在不按 D0 时重触发。
+* 一个 MIDI 音符 = 一根弦，同弦重叠音一律重新拨弦。
 
 ---
 
@@ -345,6 +358,7 @@ build\host_test.exe    67 passed, 0 failed
 | 1.0 | Offset JM | 六弦波导 + 摇把弹簧 + 拾音器/琴体/功放 |
 | 1.1 | Offset JM | 修卸载崩溃（参数双释放）、琴体双声道、调弦表、两套电路、P90+HB、UI 换图 |
 | 1.2 | Offset JM | keyswitch 技法、CC 摇把、反向混响、反馈、swell、trem picking |
+| 1.8 | **HanaGuitar for indie** | 修掉默认的“滑音”：新音一律重新拨弦，legato 只在按住 D0 时；加 SAVE / USER 用户预设 |
 | 1.7 | **HanaGuitar for indie** | 摇把支持上拉：DIVE/LIFT 方向、+2 半音上行程、Flutter 旋钮 |
 | 1.6 | **HanaGuitar for indie** | reload 黑屏修复：窗口类注册到插件 DLL（不再是宿主 EXE），GDI+ 不再随视图销毁 |
 | 1.5 | **HanaGuitar for indie** | 摇把改成可拖拽的 ADSR 面板（取代 Bar Rate/Depth 旋钮），note-on 触发 / note-off 释放 |

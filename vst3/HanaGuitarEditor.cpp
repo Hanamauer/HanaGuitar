@@ -35,6 +35,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 using namespace Steinberg;
@@ -340,6 +342,9 @@ private:
 	void setValue (int id, double norm, bool gesture);
 	void applyPreset (int idx);
 	int presetIndex () const;
+	void saveUserPreset ();
+	bool loadUserPreset ();
+	std::string userPresetPath () const;
 	void toggleCircuit ();
 
 	static void formatValue (int id, double norm, char* out, int n);
@@ -360,7 +365,7 @@ private:
 	Knob knobs[kNumKnobs];
 	int knobCount_ = 0;
 	RectI circuitSwitch_;
-	RectI presetBtn_[4];
+	RectI presetBtn_[6];   // 5 slots (last one is USER) + SAVE
 	RectI barRect_;
 	RectI envRect_;
 	RectI barDirRect_;
@@ -370,6 +375,7 @@ private:
 	int dragY0_ = 0;
 	double dragV0_ = 0.0;
 	int presetHot_ = -1;
+	double savedUntil_ = 0.0;
 	int knobHot_ = -1;
 	int presetIdx_ = 3;
 
@@ -459,9 +465,9 @@ void HanaGuitarEditor::buildLayout ()
 		envRect_ = { kKnobX + 94, wy + 5, kRight - (kKnobX + 94), kRowH - 10 };
 	}
 
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < 6; ++i)
 	{
-		const int bw = (kRight - kX0 - 3 * 8) / 4;
+		const int bw = (kRight - kX0 - 5 * 8) / 6;
 		presetBtn_[i].x = kX0 + i * (bw + 8);
 		presetBtn_[i].y = kPresetY;
 		presetBtn_[i].w = bw;
@@ -633,6 +639,7 @@ tresult PLUGIN_API HanaGuitarEditor::attached (void* parent, FIDString type)
 	syncToParent ();
 	InvalidateRect (hwnd_, nullptr, TRUE);
 	UpdateWindow (hwnd_);              // never show an unpainted (black) window
+	if (presetIndex () == 4) applyPreset (4);   // USER slot survives a reload
 	uiLog ("attached", winW_, winH_);
 	viewMap ().add (this, hwnd_);
 	SetTimer (hwnd_, 1, 50, nullptr);
@@ -903,7 +910,9 @@ void HanaGuitarEditor::drawHeader (GpGraphics* g)
 }
 void HanaGuitarEditor::drawPresets (GpGraphics* g)
 {
-	for (int i = 0; i < 4; ++i)
+	const char* names[5] = { kPresets[0].name, kPresets[1].name, kPresets[2].name,
+	                         kPresets[3].name, "USER" };
+	for (int i = 0; i < 5; ++i)
 	{
 		const bool sel = (presetIndex () == i);
 		const bool hot = (presetHot_ == i);
@@ -923,9 +932,30 @@ void HanaGuitarEditor::drawPresets (GpGraphics* g)
 			GdipDeletePath (path);
 			GdipDeletePen (p);
 		}
-		txt (g, sel ? brAccent_ : brInk_, fPreset_, kPresets[i].name,
+		txt (g, sel ? brAccent_ : brInk_, fPreset_, names[i],
 		     presetBtn_[i].x, presetBtn_[i].y + 7, presetBtn_[i].w, 18, 1);
 		GdipDeleteBrush (bg);
+	}
+
+	// SAVE writes the current panel to the user slot
+	{
+		const RectI& b = presetBtn_[5];
+		const bool flash = savedUntil_ > (double) GetTickCount64 ();
+		GpSolidFill* bg = nullptr;
+		GdipCreateSolidFill (flash ? argb (kAccent, 70) : argb (kPanelHi), &bg);
+		fillRound (g, bg, b.x, b.y, b.w, b.h, 5);
+		GdipDeleteBrush (bg);
+		GpPen* bp = nullptr;
+		GdipCreatePen1 (argb (kAccent, flash ? 220 : 120), 1.f, UnitPixel, &bp);
+		GpPath* bpath = nullptr;
+		GdipCreatePath (FillModeWinding, &bpath);
+		GdipAddPathRectangle (bpath, (float) b.x + 0.5f, (float) b.y + 0.5f,
+		                      (float) b.w - 1.f, (float) b.h - 1.f);
+		GdipDrawPath (g, bp, bpath);
+		GdipDeletePath (bpath);
+		GdipDeletePen (bp);
+		txt (g, flash ? brLamp_ : brAccent_, fPreset_, flash ? "SAVED" : "SAVE",
+		     b.x, b.y + 7, b.w, 18, 1);
 	}
 }
 
@@ -1168,7 +1198,7 @@ void HanaGuitarEditor::drawLegend (GpGraphics* g)
 void HanaGuitarEditor::drawFooter (GpGraphics* g)
 {
 	txt (g, brDim_, fTiny_, "BAR: drag readout / CC1 / pitch bend", kX0, kH - 14, 300, 12);
-	txt (g, brDim_, fTiny_, "HanaGuitar 1.7", kRight - 120, kH - 14, 120, 12, 2);
+	txt (g, brDim_, fTiny_, "HanaGuitar 1.8", kRight - 120, kH - 14, 120, 12, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1278,15 +1308,22 @@ void HanaGuitarEditor::toggleCircuit ()
 
 void HanaGuitarEditor::applyPreset (int idx)
 {
-	if (!sink_ || idx < 0 || idx >= 4) return;
+	if (!sink_ || idx < 0 || idx > 4) return;
 	for (int i = 0; i < (int) kNumKnobs; ++i)
 		setValue (i, (double) normFromPlain (kParamDefs[i], kParamDefs[i].def), true);
 
-	const PresetDef& p = kPresets[idx];
-	for (int i = 0; i < p.n; ++i)
-		setValue (p.kv[i].id, (double) normFromPlain (kParamDefs[p.kv[i].id], p.kv[i].plain), true);
+	if (idx < 4)
+	{
+		const PresetDef& p = kPresets[idx];
+		for (int i = 0; i < p.n; ++i)
+			setValue (p.kv[i].id, (double) normFromPlain (kParamDefs[p.kv[i].id], p.kv[i].plain), true);
+	}
+	else
+	{
+		loadUserPreset ();
+	}
 
-	setValue (kPreset, (double) idx / 3.0, true);
+	setValue (kPreset, (double) idx / 4.0, true);
 	presetIdx_ = idx;
 }
 
@@ -1294,8 +1331,76 @@ int HanaGuitarEditor::presetIndex () const
 {
 	if (!sink_) return presetIdx_;
 	const double n = sink_->getNormalized (kPreset);
-	int i = (int) (n * 3.0 + 0.5);
-	return std::min (3, std::max (0, i));
+	int i = (int) (n * 4.0 + 0.5);
+	return std::min (4, std::max (0, i));
+}
+
+// ---------------------------------------------------------------------------
+// User preset: a plain text dump of every parameter, written next to the
+// user's app data so it survives a plugin reload and a DAW restart.  The host
+// may also save presets (getState/setState) -- this is the in-panel path for
+// hosts that hide that menu.
+// ---------------------------------------------------------------------------
+std::string HanaGuitarEditor::userPresetPath () const
+{
+	auto env = [] (const char* name) {
+		char buf[MAX_PATH] = {};
+		const DWORD n = GetEnvironmentVariableA (name, buf, MAX_PATH);
+		return (n > 0 && n < MAX_PATH) ? std::string (buf) : std::string ();
+	};
+
+	std::string base = env ("HANAGUITAR_PRESET_DIR");
+	if (base.empty ())
+	{
+		const std::string a = env ("APPDATA");
+		if (!a.empty ()) base = a + "\\HanaGuitar";
+	}
+	if (base.empty ()) base = env ("TEMP");
+	if (base.empty ()) base = ".";
+	if (base.empty ()) base = ".";
+	CreateDirectoryA (base.c_str (), nullptr);
+	return base + "\\user.hnp";
+}
+
+void HanaGuitarEditor::saveUserPreset ()
+{
+	if (!sink_) return;
+	const std::string path = userPresetPath ();
+	FILE* f = std::fopen (path.c_str (), "wb");
+	if (!f) { uiLog ("preset-save-failed", 0, 0); return; }
+
+	std::fprintf (f, "HGPRESET 1\n");
+	for (int i = 0; i < (int) kNumParams; ++i)
+		std::fprintf (f, "%d %.9f\n", i, (double) sink_->getNormalized (i));
+	std::fclose (f);
+
+	savedUntil_ = (double) GetTickCount64 () + 1500.0;
+	presetIdx_ = 4;
+	setValue (kPreset, 1.0, true);          // the USER slot now holds this patch
+	InvalidateRect (hwnd_, nullptr, FALSE);
+}
+
+bool HanaGuitarEditor::loadUserPreset ()
+{
+	if (!sink_) return false;
+	FILE* f = std::fopen (userPresetPath ().c_str (), "rb");
+	if (!f) return false;
+
+	char magic[16] = {};
+	int ver = 0;
+	if (std::fscanf (f, "%15s %d", magic, &ver) != 2 || std::strcmp (magic, "HGPRESET") != 0)
+	{
+		std::fclose (f);
+		return false;
+	}
+
+	int id = 0;
+	double v = 0.0;
+	while (std::fscanf (f, "%d %lf", &id, &v) == 2)
+		if (id >= 0 && id < (int) kNumParams)
+			setValue (id, v, true);
+	std::fclose (f);
+	return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1341,6 +1446,11 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 
 	case WM_TIMER:
 		syncToParent ();
+		if (savedUntil_ > 0.0 && savedUntil_ <= (double) GetTickCount64 ())
+		{
+			savedUntil_ = 0.0;
+			InvalidateRect (h, nullptr, FALSE);
+		}
 		{
 			RECT rc = {}, prc = {};
 			GetClientRect (h, &rc);
@@ -1380,7 +1490,7 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 		if (id != knobHot_) { knobHot_ = id; InvalidateRect (h, nullptr, FALSE); }
 
 		int hot = -1;
-		for (int i = 0; i < 4; ++i) if (presetBtn_[i].has (dx, dy)) hot = i;
+		for (int i = 0; i < 5; ++i) if (presetBtn_[i].has (dx, dy)) hot = i;
 		if (hot != presetHot_) { presetHot_ = hot; InvalidateRect (h, nullptr, FALSE); }
 
 		if (dx < kImageW) SetCursor (LoadCursorW (nullptr, IDC_ARROW));
@@ -1393,8 +1503,9 @@ LRESULT HanaGuitarEditor::wndProc (HWND h, UINT m, WPARAM w, LPARAM l)
 		designFromWindow (GET_X_LPARAM (l), GET_Y_LPARAM (l), dx, dy);
 		SetCapture (h);
 
-		for (int i = 0; i < 4; ++i)
+		for (int i = 0; i < 5; ++i)
 			if (presetBtn_[i].has (dx, dy)) { applyPreset (i); return 0; }
+		if (presetBtn_[5].has (dx, dy)) { saveUserPreset (); return 0; }
 
 		if (circuitSwitch_.has (dx, dy)) { toggleCircuit (); return 0; }
 

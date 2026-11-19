@@ -736,6 +736,42 @@ static void testBarLift ()
 	check ("lift pulls the pitch up", lift > 0.8f, buf);
 }
 
+
+// ---------------------------------------------------------------------------
+static void testNoGlideByDefault ()
+{
+	std::printf ("\n[3i] articulation -- a new note re-plucks instead of gliding\n");
+
+	Rig rig;
+	rig.set (jm::kDrive, 0.f);
+	rig.set (jm::kCab, 0.f);
+	rig.set (jm::kChorus, 0.f);
+	rig.set (jm::kDelayMix, 0.f);
+	rig.set (jm::kRevMix, 0.f);
+	rig.set (jm::kBody, 0.f);
+	rig.set (jm::kSustain, 0.9f);
+
+	rig.e.noteOn (40, 0.9f);            // E2 on string 0
+	rig.render (9600);
+	const float age0 = rig.e.stringAge (0);
+
+	rig.e.noteOn (43, 0.9f);            // G2 over the ringing string
+	rig.render (64);
+	const float age1 = rig.e.stringAge (0);
+
+	rig.e.keyswitch (jm::kKsTap, true);
+	rig.e.noteOn (45, 0.9f);            // A2 with the tap key held: legato
+	rig.render (64);
+	const float age2 = rig.e.stringAge (0);
+
+	char buf[200];
+	std::snprintf (buf, sizeof (buf), "age %.0f -> %.0f (legato %.0f)", age0, age1, age2);
+	check ("a new note restarts the string (no portamento)", age1 < age0 * 0.2f, buf);
+	check ("the tap key still gives legato", age2 > age1 + 30.f, buf);
+
+	rig.e.keyswitch (jm::kKsTap, false);
+}
+
 // ---------------------------------------------------------------------------
 static void testLowMasking ()
 {
@@ -1029,6 +1065,7 @@ int main (int argc, char** argv)
 	testLegato ();
 	testBarEnvelope ();
 	testBarLift ();
+	testNoGlideByDefault ();
 	testLowMasking ();
 	testSilence ();
 	testBlockSize ();

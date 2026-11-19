@@ -328,7 +328,11 @@ public:
 		str[slot].setSympathetic (0.f);
 		str[slot].setRatio (whammy.ratio ());
 
-		if (prevTop >= 0 && prevTop != midiNote && !retrigger)
+		// Legato is a keyswitch, not the default: only the tap key turns a
+		// re-strike into a hammer-on.  Retuning a ringing string instead of
+		// picking it makes consecutive chords slide into each other -- that is
+		// the "everything glides" bug.
+		if (prevTop >= 0 && prevTop != midiNote && !retrigger && technique.tap)
 		{
 			// Hammer-on: the string is already sounding, so only the speaking
 			// length changes.  A small contact burst stands in for the finger
@@ -613,6 +617,7 @@ public:
 	}
 
 	float barSemis () const { return whammy.semitones (); }
+	float stringAge (int i) const { return str[i].age; }
 	int envStage () const { return envStage_; }
 	int heldCount () const { return held_; }
 	float envValue () const { return envLevel_; }

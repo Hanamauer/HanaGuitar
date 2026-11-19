@@ -98,7 +98,7 @@ static const char* kBarDirItems[] = { "Dive", "Lift" };
 static const char* kTuningItems[] = { "Standard", "Drop D", "Eb Standard", "DADGAD",
                                       "Open E", "FACGCE", "DAEAC#E" };
 static const char* kRevItems[] = { "Room", "Hall", "Plate", "Gate", "Reverse" };
-static const char* kPresetItems[] = { "Shoegaze", "Midwest Emo", "Glide Lead", "Clean JM" };
+static const char* kPresetItems[] = { "Shoegaze", "Midwest Emo", "Glide Lead", "Clean JM", "User" };
 
 // ---------------------------------------------------------------------------
 // parameter table. Order MUST match the enum above (ids are contiguous).
@@ -148,7 +148,7 @@ static const ParamDef kParamDefs[] = {
 	{ kBarDepth,     "Bar Depth",   "WHAMMY",  "",   0.f, 1.f,  0.00f, 0, nullptr, 0 },
 	{ kBarDir,       "Bar Dir",     "WHAMMY",  "",   0.f, 1.f,  0.f,   1, kBarDirItems, 2 },
 	// preset
-	{ kPreset,       "Preset",      "",        "",   0.f, 3.f,  3.f,   3, kPresetItems, 4 },
+	{ kPreset,       "Preset",      "",        "",   0.f, 4.f,  3.f,   4, kPresetItems, 5 },
 	{ kBar,          "Bar",         "WHAMMY",  "",   0.f, 1.f,  0.f,   0, nullptr, 0 },
 };
 

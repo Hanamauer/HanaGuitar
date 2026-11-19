@@ -359,6 +359,10 @@ static int paintNonBlack (HWND hwnd, int w, int h)
 int main (int argc, char** argv)
 {
 	std::setvbuf (stdout, nullptr, _IONBF, 0);
+	CreateDirectoryA ("build\\preset-test", nullptr);
+	SetEnvironmentVariableA ("HANAGUITAR_PRESET_DIR", "build\\preset-test");
+	CreateDirectoryA ("build\\preset-test", nullptr);
+	SetEnvironmentVariableA ("HANAGUITAR_PRESET_DIR", "build\\preset-test");
 	const char* dllPath = (argc > 1) ? argv[1] : "dist\\HanaGuitar.vst3";
 
 	std::printf ("==========================================================================\n");
@@ -547,10 +551,15 @@ int main (int argc, char** argv)
 		std::snprintf (msg, sizeof (msg), "(\"%s\")", a);
 		check ("pickup formats as a name", std::strcmp (a, "P90") == 0, msg);
 
-		rig.ctrl->getParamStringByValue (jm::kPreset, 1.0, s);
+		rig.ctrl->getParamStringByValue (jm::kPreset, 0.75, s);
 		toAscii (s, a, 128);
 		std::snprintf (msg, sizeof (msg), "(\"%s\")", a);
 		check ("preset formats as a name", std::strcmp (a, "Clean JM") == 0, msg);
+
+		rig.ctrl->getParamStringByValue (jm::kPreset, 1.0, s);
+		toAscii (s, a, 128);
+		std::snprintf (msg, sizeof (msg), "(\"%s\")", a);
+		check ("user slot formats as a name", std::strcmp (a, "User") == 0, msg);
 	}
 
 	// put everything back to defaults before making sound
@@ -1008,6 +1017,30 @@ int main (int argc, char** argv)
 					               beforeDrive, afterDrive);
 					check ("preset button changes a parameter",
 					       std::fabs (afterDrive - beforeDrive) > 0.05, msg);
+				}
+
+				// User preset: SAVE writes the panel, USER reads it back.
+				{
+					driveParam (rig, jm::kDrive,
+					            (double) jm::normFromPlain (jm::kParamDefs[jm::kDrive], 0.31f));
+					const int saveX = 528 + 5 * 97 + 44, py = 83;
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (saveX, py));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (saveX, py));
+
+					const bool wrote = GetFileAttributesA ("build\\preset-test\\user.hnp") != INVALID_FILE_ATTRIBUTES;
+					check ("SAVE writes a user preset file", wrote);
+
+					driveParam (rig, jm::kDrive,
+					            (double) jm::normFromPlain (jm::kParamDefs[jm::kDrive], 0.05f));
+					const int userX = 528 + 4 * 97 + 44;
+					SendMessageW (child, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM (userX, py));
+					SendMessageW (child, WM_LBUTTONUP, 0, MAKELPARAM (userX, py));
+
+					const double restored = rig.getParam (jm::kDrive);
+					const double want = (double) jm::normFromPlain (jm::kParamDefs[jm::kDrive], 0.31f);
+					std::snprintf (msg, sizeof (msg), "(drive restored %.3f, want %.3f)",
+					               restored, want);
+					check ("USER restores the saved preset", std::fabs (restored - want) < 0.01, msg);
 				}
 
 				// The circuit switch: clicking RHYTHM must move the parameter
